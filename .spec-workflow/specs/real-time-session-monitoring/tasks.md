@@ -9,7 +9,7 @@
   - _Requirements: Requirement 1, Requirement 2_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: TypeScript Developer specializing in real-time data modeling and session monitoring | Task: Create comprehensive TypeScript interfaces for SessionState, MonitoringUpdate, and SessionControls following Requirements 1 and 2, extending existing type patterns from task and conversation types | Restrictions: Do not modify existing type files, maintain compatibility with existing session data, follow project naming conventions | _Leverage: Follow patterns from lib/types/task.ts for session status and lib/types/conversation.ts for session metadata | _Requirements: Requirement 1 (live session state detection), Requirement 2 (session progress tracking) | Success: All interfaces compile without errors, support real-time data updates, compatible with existing session structures | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 2. Create session state detector in lib/services/sessionStateDetector.ts
+- [x] 2. Create session state detector in lib/services/sessionStateDetector.ts
   - File: lib/services/sessionStateDetector.ts
   - Implement session file monitoring and process state detection
   - Follow patterns from lib/services/sessionService.ts and conversationService.ts
@@ -18,7 +18,7 @@
   - _Requirements: Requirement 1, Requirement 3_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Backend Developer with expertise in file system monitoring and process detection | Task: Implement session state detection logic following Requirements 1 and 3, building on existing session and conversation service patterns for file monitoring and state analysis | Restrictions: Must handle large session files efficiently, prevent file system overload, gracefully handle corrupted data | _Leverage: Use existing file scanning patterns from sessionService.ts and JSONL parsing from conversationService.ts | _Requirements: Requirement 1 (session state detection), Requirement 3 (session health monitoring) | Success: Accurately detects session states, handles file system errors gracefully, performs efficiently with multiple sessions | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 3. Create session controller in lib/services/sessionController.ts
+- [x] 3. Create session controller in lib/services/sessionController.ts
   - File: lib/services/sessionController.ts
   - Implement pause/resume/terminate operations for Claude Code sessions
   - Handle process management and error recovery
