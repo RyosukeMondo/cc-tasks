@@ -54,7 +54,7 @@
   - _Requirements: Requirement 2_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in structured data display and JSON formatting | Task: Create ToolUse component following Requirement 2, displaying tool invocations with clear tool names and formatted parameters | Restrictions: Must format JSON parameters safely, ensure readability, handle complex parameter structures | _Leverage: Use existing code display patterns for JSON formatting and syntax highlighting | _Requirements: Requirement 2 (tool use entry distinction) | Success: Component displays tool uses clearly, parameters properly formatted, tool names prominent | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 7. Create tool result component in components/conversations/ToolResult.tsx
+- [x] 7. Create tool result component in components/conversations/ToolResult.tsx
   - File: components/conversations/ToolResult.tsx
   - Display tool execution results and link to corresponding tool use
   - Handle success and error states with appropriate styling
@@ -63,7 +63,7 @@
   - _Requirements: Requirement 2_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in result display and error state handling | Task: Create ToolResult component following Requirement 2, displaying tool results with clear success/error indication and linking to corresponding tool use | Restrictions: Must handle both success and error states, provide clear visual feedback, link results to tool use entries | _Leverage: Follow existing error display patterns and result formatting utilities | _Requirements: Requirement 2 (tool result entry distinction) | Success: Component displays tool results clearly, error states obvious, proper linking to tool use | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 8. Create conversation viewer component in components/conversations/ConversationViewer.tsx
+- [x] 8. Create conversation viewer component in components/conversations/ConversationViewer.tsx
   - File: components/conversations/ConversationViewer.tsx
   - Main container for conversation display with scrolling and navigation
   - Handle loading states and conversation entry rendering
