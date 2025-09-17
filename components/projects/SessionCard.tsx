@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { SessionMetadata } from "@/lib/types/project";
 import { cardSurface } from "@/lib/ui/layout";
+import { SessionStatusIndicator } from "@/components/monitoring/SessionStatusIndicator";
+import { SessionControlPanel } from "@/components/monitoring/SessionControlPanel";
+import { MonitoringUpdate, SessionControlRequest, SessionControlResult } from "@/lib/types/monitoring";
 
 type SessionStatus = "accessible" | "error";
 
@@ -53,15 +56,50 @@ function formatLastModified(lastModified: string): string {
   return `${Math.floor(daysDiff / 365)} years ago`;
 }
 
+function formatDuration(milliseconds: number): string {
+  const seconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
 type SessionCardProps = {
   session: SessionMetadata;
   projectId?: string;
   onClick?: () => void;
+  // Optional monitoring integration
+  monitoringData?: MonitoringUpdate;
+  onControlAction?: (request: SessionControlRequest) => Promise<SessionControlResult>;
+  showControls?: boolean;
 };
 
-export function SessionCard({ session, projectId, onClick }: SessionCardProps) {
+export function SessionCard({ 
+  session, 
+  projectId, 
+  onClick, 
+  monitoringData, 
+  onControlAction, 
+  showControls = false 
+}: SessionCardProps) {
   const router = useRouter();
   const status: SessionStatus = session.isAccessible ? "accessible" : "error";
+  
+  // Use monitoring data for real-time status if available
+  const hasMonitoringData = !!monitoringData;
+  const currentSessionState = monitoringData?.state;
+  const sessionProgress = monitoringData?.progress;
+  const sessionControls = monitoringData ? {
+    sessionId: monitoringData.sessionId,
+    projectId: monitoringData.projectId,
+    availableActions: ['pause', 'resume', 'terminate', 'restart'] as const,
+    canPause: currentSessionState === 'active' || currentSessionState === 'idle',
+    canResume: currentSessionState === 'paused',
+    canTerminate: currentSessionState !== 'terminated',
+    canRestart: true
+  } : null;
 
   const handleViewContent = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -88,8 +126,25 @@ export function SessionCard({ session, projectId, onClick }: SessionCardProps) {
           <p className="text-xs text-slate-400 truncate mt-1">
             {session.filePath}
           </p>
+          {hasMonitoringData && sessionProgress?.currentActivity && (
+            <p className="text-xs text-blue-300 truncate mt-1">
+              {sessionProgress.currentActivity}
+            </p>
+          )}
         </div>
-        <SessionStatusBadge status={status} />
+        <div className="flex flex-col gap-2 items-end">
+          {hasMonitoringData && currentSessionState ? (
+            <SessionStatusIndicator status={currentSessionState} size="sm" />
+          ) : (
+            <SessionStatusBadge status={status} />
+          )}
+          {hasMonitoringData && sessionProgress && (
+            <div className="text-xs text-slate-400 text-right space-y-1">
+              <div>{sessionProgress.tokenUsage.totalTokens.toLocaleString()} tokens</div>
+              <div>{formatDuration(sessionProgress.duration)}</div>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="mt-3 flex items-center justify-between text-xs">
@@ -97,9 +152,15 @@ export function SessionCard({ session, projectId, onClick }: SessionCardProps) {
           <div className="text-slate-300">
             <span className="font-medium">{formatFileSize(session.fileSize)}</span>
           </div>
-          <div className="text-slate-400">
-            Modified: {formatLastModified(session.lastModified)}
-          </div>
+          {hasMonitoringData && sessionProgress ? (
+            <div className="text-slate-400">
+              {sessionProgress.messagesCount} messages
+            </div>
+          ) : (
+            <div className="text-slate-400">
+              Modified: {formatLastModified(session.lastModified)}
+            </div>
+          )}
         </div>
         
         {projectId && session.isAccessible && (
@@ -119,6 +180,19 @@ export function SessionCard({ session, projectId, onClick }: SessionCardProps) {
       {!session.isAccessible && (
         <div className="mt-2 text-xs text-red-400">
           Unable to access session file
+        </div>
+      )}
+      
+      {/* Session Control Panel */}
+      {showControls && hasMonitoringData && sessionControls && onControlAction && currentSessionState && (
+        <div className="mt-4 pt-3 border-t border-white/10">
+          <SessionControlPanel
+            sessionId={sessionControls.sessionId}
+            projectId={sessionControls.projectId}
+            currentState={currentSessionState}
+            controls={sessionControls}
+            onControlAction={onControlAction}
+          />
         </div>
       )}
     </div>

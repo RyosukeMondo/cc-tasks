@@ -63,7 +63,7 @@
   - _Requirements: Requirement 2_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Data Visualization Developer with expertise in progress indicators and metrics display | Task: Create session progress display following Requirement 2, showing token usage, current activity, and real-time progress metrics with clear visual hierarchy | Restrictions: Must handle real-time data updates smoothly, prevent UI flickering, display metrics clearly without overwhelming the interface | _Leverage: Use existing typography and spacing patterns for consistent metrics display | _Requirements: Requirement 2 (session progress tracking) | Success: Progress metrics are clearly displayed, real-time updates are smooth, information hierarchy is intuitive | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 8. Create session control panel component in components/monitoring/SessionControlPanel.tsx
+- [x] 8. Create session control panel component in components/monitoring/SessionControlPanel.tsx
   - File: components/monitoring/SessionControlPanel.tsx
   - Interactive controls for pause/resume/terminate operations
   - Handle control states and provide user feedback for operations
@@ -72,7 +72,7 @@
   - _Requirements: Requirement 5_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: UX Developer with expertise in control interfaces and user feedback systems | Task: Create session control panel following Requirement 5, implementing pause/resume/terminate controls with clear user feedback and confirmation flows | Restrictions: Must provide confirmation for destructive actions, handle disabled states properly, ensure operations are clearly labeled and accessible | _Leverage: Follow button and interaction patterns from existing components, ensure consistent styling | _Requirements: Requirement 5 (session interaction controls) | Success: Controls are intuitive and safe to use, feedback is immediate and clear, destructive actions have appropriate safeguards | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 9. Enhance SessionCard with monitoring integration in components/projects/SessionCard.tsx
+- [x] 9. Enhance SessionCard with monitoring integration in components/projects/SessionCard.tsx
   - File: components/projects/SessionCard.tsx (modify existing)
   - Add real-time status indicators and control actions to existing session cards
   - Integrate with monitoring data and control components
