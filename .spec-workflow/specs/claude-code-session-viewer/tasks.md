@@ -36,7 +36,7 @@
   - _Requirements: Requirement 2, Requirement 5_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in message display components and content formatting | Task: Create UserMessage component following Requirements 2 and 5, displaying user input with proper styling, content preservation, and metadata | Restrictions: Must sanitize content safely, preserve formatting, maintain consistent styling with design system | _Leverage: Use existing typography patterns and responsive text layout | _Requirements: Requirement 2 (user message distinction), Requirement 5 (content formatting) | Success: Component displays user messages clearly, content properly formatted, safe rendering | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 5. Create assistant message component in components/conversations/AssistantMessage.tsx
+- [x] 5. Create assistant message component in components/conversations/AssistantMessage.tsx
   - File: components/conversations/AssistantMessage.tsx
   - Display Claude assistant responses with markdown and code block support
   - Preserve formatting while maintaining security and readability
@@ -45,7 +45,7 @@
   - _Requirements: Requirement 2, Requirement 5_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in markdown rendering and code display | Task: Create AssistantMessage component following Requirements 2 and 5, displaying assistant responses with markdown support and code block preservation | Restrictions: Must preserve code formatting, handle markdown safely, prevent XSS while maintaining readability | _Leverage: Follow existing code display patterns and content formatting utilities | _Requirements: Requirement 2 (assistant message distinction), Requirement 5 (content preservation) | Success: Component renders assistant responses with proper formatting, code blocks preserved, secure content handling | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 6. Create tool use component in components/conversations/ToolUse.tsx
+- [x] 6. Create tool use component in components/conversations/ToolUse.tsx
   - File: components/conversations/ToolUse.tsx
   - Display tool invocation details including tool name and parameters
   - Format parameters as readable JSON with syntax highlighting
