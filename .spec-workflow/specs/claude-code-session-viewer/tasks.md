@@ -90,7 +90,7 @@
   - _Requirements: Requirement 1, Requirement 4_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Full-stack Developer with expertise in Next.js dynamic routing and conversation display | Task: Create session content page following Requirements 1 and 4, implementing dynamic routing for conversation content display using ConversationViewer and conversationService | Restrictions: Must handle invalid session IDs, provide proper error boundaries, implement loading states | _Leverage: Use ConversationViewer component and conversationService, follow Next.js dynamic routing patterns | _Requirements: Requirement 1 (session content viewing), Requirement 4 (navigation integration) | Success: Page displays session content correctly, handles routing errors, proper loading and error states | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 11. Enhance session card with view action in components/projects/SessionCard.tsx
+- [x] 11. Enhance session card with view action in components/projects/SessionCard.tsx
   - File: components/projects/SessionCard.tsx (modify existing)
   - Add "View Content" action button to existing session cards
   - Integrate navigation to session content page
