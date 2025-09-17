@@ -352,7 +352,7 @@ export function formatConversationContent(
  * @param parameters - Tool parameters object
  * @returns Safely formatted parameters as JSON string
  */
-export function formatToolParameters(parameters: Record<string, any>): string {
+export function formatToolParameters(parameters: Record<string, unknown>): string {
   try {
     if (!parameters || typeof parameters !== 'object') {
       return '{}';
@@ -362,6 +362,7 @@ export function formatToolParameters(parameters: Record<string, any>): string {
     const jsonString = JSON.stringify(parameters, null, 2);
     return escapeHtml(jsonString);
   } catch (error) {
+    console.warn("Failed to format tool parameters:", error);
     return escapeHtml('{"error": "Invalid parameters"}');
   }
 }
@@ -412,3 +413,4 @@ export function validateContentSecurity(content: string): boolean {
     return false;
   }
 }
+

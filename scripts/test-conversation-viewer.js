@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 /**
  * Integration test script for the claude-code-session-viewer feature
@@ -7,7 +8,6 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const os = require('os');
 
 // Test configuration
 const TEST_CONFIG = {
@@ -152,9 +152,9 @@ async function runPerformanceTest() {
                            memoryUsed < TEST_CONFIG.memoryThreshold;
   
   if (performancePassed) {
-    console.log('✅ Performance test PASSED');
+    console.log('✁EPerformance test PASSED');
   } else {
-    console.log('❌ Performance test FAILED');
+    console.log('❁EPerformance test FAILED');
     if (totalTime >= TEST_CONFIG.performanceThreshold) {
       console.log(`  - Time exceeded threshold: ${totalTime}ms >= ${TEST_CONFIG.performanceThreshold}ms`);
     }
@@ -168,7 +168,7 @@ async function runPerformanceTest() {
 
 // Security test function
 async function runSecurityTest() {
-  console.log('\n🛡️  Running security tests...');
+  console.log('\n🛡�E�E Running security tests...');
   
   const securityTestCases = generateSecurityTestCases();
   let securityPassed = true;
@@ -186,19 +186,19 @@ async function runSecurityTest() {
       (testCase.parameters && JSON.stringify(testCase.parameters).includes('alert'));
     
     if (containsDangerousContent) {
-      console.log(`    ⚠️  Dangerous content detected (expected in test)`);
+      console.log(`    ⚠�E�E Dangerous content detected (expected in test)`);
     } else {
-      console.log(`    ✅ Content appears safe`);
+      console.log(`    ✁EContent appears safe`);
     }
   }
   
-  console.log('✅ Security test PASSED (dangerous content detection working)');
+  console.log('✁ESecurity test PASSED (dangerous content detection working)');
   return { passed: securityPassed };
 }
 
 // Functionality test
 async function runFunctionalityTest() {
-  console.log('\n⚙️  Running functionality tests...');
+  console.log('\n⚙︁E Running functionality tests...');
   
   const testEntries = generateMockConversationData(20);
   let functionalityPassed = true;
@@ -208,7 +208,7 @@ async function runFunctionalityTest() {
   const expectedTypes = new Set(['user', 'assistant', 'tool_use', 'tool_result']);
   const hasAllTypes = [...expectedTypes].every(type => entryTypes.has(type));
   
-  console.log(`  ✅ Entry types test: ${hasAllTypes ? 'PASSED' : 'FAILED'}`);
+  console.log(`  ✁EEntry types test: ${hasAllTypes ? 'PASSED' : 'FAILED'}`);
   if (!hasAllTypes) {
     functionalityPassed = false;
     console.log(`    Expected: ${[...expectedTypes].join(', ')}`);
@@ -219,7 +219,7 @@ async function runFunctionalityTest() {
   const hasCodeBlocks = testEntries.some(e => e.content.includes('```'));
   const hasMarkdown = testEntries.some(e => e.content.includes('**') || e.content.includes('*'));
   
-  console.log(`  ✅ Content formatting test: ${hasCodeBlocks && hasMarkdown ? 'PASSED' : 'FAILED'}`);
+  console.log(`  ✁EContent formatting test: ${hasCodeBlocks && hasMarkdown ? 'PASSED' : 'FAILED'}`);
   if (!hasCodeBlocks || !hasMarkdown) {
     functionalityPassed = false;
   }
@@ -227,7 +227,7 @@ async function runFunctionalityTest() {
   // Test 3: Metadata validation
   const hasMetadata = testEntries.every(e => e.metadata && typeof e.metadata.tokenCount === 'number');
   
-  console.log(`  ✅ Metadata test: ${hasMetadata ? 'PASSED' : 'FAILED'}`);
+  console.log(`  ✁EMetadata test: ${hasMetadata ? 'PASSED' : 'FAILED'}`);
   if (!hasMetadata) {
     functionalityPassed = false;
   }
@@ -236,15 +236,15 @@ async function runFunctionalityTest() {
   const toolUseEntries = testEntries.filter(e => e.type === 'tool_use');
   const hasToolFields = toolUseEntries.every(e => e.toolName && e.parameters);
   
-  console.log(`  ✅ Tool entries test: ${hasToolFields ? 'PASSED' : 'FAILED'}`);
+  console.log(`  ✁ETool entries test: ${hasToolFields ? 'PASSED' : 'FAILED'}`);
   if (!hasToolFields) {
     functionalityPassed = false;
   }
   
   if (functionalityPassed) {
-    console.log('✅ Functionality test PASSED');
+    console.log('✁EFunctionality test PASSED');
   } else {
-    console.log('❌ Functionality test FAILED');
+    console.log('❁EFunctionality test FAILED');
   }
   
   return { passed: functionalityPassed };
@@ -273,9 +273,10 @@ async function validateFileStructure() {
   for (const file of requiredFiles) {
     try {
       await fs.access(path.join(process.cwd(), file));
-      console.log(`  ✅ ${file}`);
+      console.log(`  ✁E${file}`);
     } catch (error) {
-      console.log(`  ❌ ${file} - NOT FOUND`);
+      const reason = error instanceof Error ? error.message : String(error);
+      console.log(`  x ${file} - NOT FOUND (${reason})`);
       allFilesExist = false;
     }
   }
@@ -315,7 +316,7 @@ async function runIntegrationTests() {
     
     let allPassed = true;
     for (const { name, result } of testCategories) {
-      const status = result.passed ? '✅ PASSED' : '❌ FAILED';
+      const status = result.passed ? '✁EPASSED' : '❁EFAILED';
       console.log(`${name.padEnd(15)}: ${status}`);
       if (!result.passed) allPassed = false;
     }
@@ -333,7 +334,7 @@ async function runIntegrationTests() {
       console.log('  • Session navigation and statistics');
       console.log('  • Mobile-responsive design');
     } else {
-      console.log('❌ SOME TESTS FAILED - Review failed tests above');
+      console.log('❁ESOME TESTS FAILED - Review failed tests above');
       process.exit(1);
     }
     

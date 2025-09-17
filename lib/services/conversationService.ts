@@ -10,7 +10,7 @@ const MAX_LINES = 10000; // Maximum lines to process
 export type ConversationService = {
   parseConversationFile: (projectId: string, sessionId: string) => Promise<ConversationEntry[]>;
   getSessionStats: (entries: ConversationEntry[]) => SessionStats;
-  validateConversationEntry: (entry: any) => ConversationEntry | null;
+  validateConversationEntry: (entry: unknown) => ConversationEntry | null;
   sanitizeContent: (content: string) => string;
 };
 
@@ -61,7 +61,7 @@ async function validateFileSize(filePath: string): Promise<void> {
 /**
  * Safely parses a single JSONL line
  */
-function parseJsonlLine(line: string, lineNumber: number): any {
+function parseJsonlLine(line: string, lineNumber: number): unknown | null {
   try {
     return JSON.parse(line);
   } catch (error) {
@@ -94,7 +94,7 @@ function extractConversationEntries(content: string): ConversationEntry[] {
     }
     
     const parsed = parseJsonlLine(line, i + 1);
-    if (!parsed) {
+    if (parsed === null) {
       continue;
     }
     
@@ -113,62 +113,61 @@ export const conversationService: ConversationService = {
   /**
    * Validates and normalizes conversation entry data
    */
-  validateConversationEntry(entry: any): ConversationEntry | null {
+  validateConversationEntry(entry: unknown): ConversationEntry | null {
     try {
-      // Check required fields
-      if (!entry || typeof entry !== 'object') {
+      if (!entry || typeof entry !== "object") {
         return null;
       }
-      
-      // Validate and extract type
-      const validTypes = ['user', 'assistant', 'tool_use', 'tool_result'];
-      if (!entry.type || !validTypes.includes(entry.type)) {
+
+      const rawEntry = entry as Record<string, unknown>;
+      const type = rawEntry.type;
+      const content = rawEntry.content;
+
+      const validTypes = ["user", "assistant", "tool_use", "tool_result"] as const;
+      if (typeof type !== "string" || !validTypes.includes(type as (typeof validTypes)[number])) {
         return null;
       }
-      
-      // Validate content (should be string)
-      if (typeof entry.content !== 'string') {
+
+      if (typeof content !== "string") {
         return null;
       }
-      
-      // Sanitize content to prevent XSS
-      const sanitizedContent = this.sanitizeContent(entry.content);
-      
-      // Build validated entry
+
+      const sanitizedContent = this.sanitizeContent(content);
+
       const validatedEntry: ConversationEntry = {
-        type: entry.type,
+        type,
         content: sanitizedContent,
-        timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString(),
+        timestamp:
+          typeof rawEntry.timestamp === "string" ? rawEntry.timestamp : new Date().toISOString(),
       };
-      
-      // Add optional fields if present and valid
-      if (typeof entry.id === 'string') {
-        validatedEntry.id = entry.id;
+
+      if (typeof rawEntry.id === "string") {
+        validatedEntry.id = rawEntry.id;
       }
-      
-      if (entry.metadata && typeof entry.metadata === 'object') {
-        validatedEntry.metadata = entry.metadata;
+
+      if (rawEntry.metadata && typeof rawEntry.metadata === "object") {
+        validatedEntry.metadata = rawEntry.metadata as ConversationEntry["metadata"];
       }
-      
-      if (typeof entry.toolName === 'string') {
-        validatedEntry.toolName = entry.toolName;
+
+      if (typeof rawEntry.toolName === "string") {
+        validatedEntry.toolName = rawEntry.toolName;
       }
-      
-      if (typeof entry.toolUseId === 'string') {
-        validatedEntry.toolUseId = entry.toolUseId;
+
+      if (typeof rawEntry.toolUseId === "string") {
+        validatedEntry.toolUseId = rawEntry.toolUseId;
       }
-      
-      if (entry.parameters && typeof entry.parameters === 'object') {
-        validatedEntry.parameters = entry.parameters;
+
+      if (rawEntry.parameters && typeof rawEntry.parameters === "object") {
+        validatedEntry.parameters = rawEntry.parameters as ConversationEntry["parameters"];
       }
-      
-      if (typeof entry.isError === 'boolean') {
-        validatedEntry.isError = entry.isError;
+
+      if (typeof rawEntry.isError === "boolean") {
+        validatedEntry.isError = rawEntry.isError;
       }
-      
+
       return validatedEntry;
     } catch (error) {
-      console.warn('Failed to validate conversation entry:', error);
+      console.warn("Failed to validate conversation entry:", error);
       return null;
     }
   },

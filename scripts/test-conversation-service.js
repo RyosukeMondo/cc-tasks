@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 /**
  * Integration test script for conversation service
@@ -133,10 +134,10 @@ async function runTests() {
     results.tests.push({ name, success, details });
     if (success) {
       results.passed++;
-      console.log(`✅ ${name}`);
+      console.log(`✁E${name}`);
     } else {
       results.failed++;
-      console.log(`❌ ${name}: ${details}`);
+      console.log(`❁E${name}: ${details}`);
     }
   }
   
@@ -195,7 +196,7 @@ async function runTests() {
   
   // Test 3: Malformed file handling
   try {
-    console.log('\n🛡️ Test 3: Malformed file handling...');
+    console.log('\n🛡�E�ETest 3: Malformed file handling...');
     process.env.CLAUDE_PROJECTS_DIR = testDir;
     
     const entries = await conversationService.parseConversationFile('.', files.malformed);
@@ -214,7 +215,7 @@ async function runTests() {
   
   // Test 4: Content sanitization
   try {
-    console.log('\n🛡️ Test 4: Content sanitization...');
+    console.log('\n🛡�E�ETest 4: Content sanitization...');
     const maliciousContent = '<script>alert("xss")</script>Normal content<iframe src="evil"></iframe>';
     const sanitized = conversationService.sanitizeContent(maliciousContent);
     
@@ -254,17 +255,17 @@ async function runTests() {
   try {
     await fs.rm(testDir, { recursive: true, force: true });
   } catch (error) {
-    console.warn(`⚠️ Failed to cleanup test directory: ${error.message}`);
+    console.warn(`⚠�E�EFailed to cleanup test directory: ${error.message}`);
   }
   
   // Print summary
   console.log('\n📊 Test Results Summary:');
-  console.log(`✅ Passed: ${results.passed}`);
-  console.log(`❌ Failed: ${results.failed}`);
+  console.log(`✁EPassed: ${results.passed}`);
+  console.log(`❁EFailed: ${results.failed}`);
   console.log(`📈 Success Rate: ${Math.round((results.passed / (results.passed + results.failed)) * 100)}%`);
   
   if (results.failed > 0) {
-    console.log('\n❌ Failed Tests:');
+    console.log('\n❁EFailed Tests:');
     results.tests.filter(t => !t.success).forEach(test => {
       console.log(`  - ${test.name}: ${test.details}`);
     });
@@ -276,7 +277,7 @@ async function runTests() {
 
 if (require.main === module) {
   runTests().catch(error => {
-    console.error('❌ Test runner failed:', error);
+    console.error('❁ETest runner failed:', error);
     process.exit(1);
   });
 }
