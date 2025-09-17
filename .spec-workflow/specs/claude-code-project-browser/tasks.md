@@ -81,7 +81,7 @@
   - _Requirements: Requirement 3_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Full-stack Developer with expertise in Next.js dynamic routing and project navigation | Task: Create project detail page following Requirement 3, implementing dynamic routing for project-specific session display using SessionList and sessionService | Restrictions: Must handle invalid project IDs, provide navigation back to project list, handle loading states | _Leverage: Use SessionList component and sessionService, follow Next.js dynamic routing patterns | _Requirements: Requirement 3 (project session navigation) | Success: Page displays project sessions correctly, handles invalid routes, proper navigation flow | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 10. Add navigation component in components/projects/ProjectNavigation.tsx
+- [x] 10. Add navigation component in components/projects/ProjectNavigation.tsx
   - File: components/projects/ProjectNavigation.tsx
   - Breadcrumb navigation between project list and project details
   - Handle back navigation and current location indication
@@ -90,7 +90,7 @@
   - _Requirements: Requirement 4_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in navigation components and user experience | Task: Create ProjectNavigation component following Requirement 4, implementing breadcrumb navigation between project views with clear location indication | Restrictions: Must follow accessibility guidelines, provide clear navigation cues, maintain responsive design | _Leverage: Use Next.js router utilities, follow existing navigation patterns | _Requirements: Requirement 4 (intuitive interface navigation) | Success: Navigation is clear and functional, proper breadcrumbs, accessible and responsive | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 11. Add error handling utilities in lib/utils/projectUtils.ts
+- [x] 11. Add error handling utilities in lib/utils/projectUtils.ts
   - File: lib/utils/projectUtils.ts
   - File path validation and sanitization utilities
   - Error formatting for project/session access failures

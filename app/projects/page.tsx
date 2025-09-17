@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ProjectList } from "@/components/projects/ProjectList";
+import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
 import { projectService } from "@/lib/services/projectService";
 import { Project } from "@/lib/types/project";
 

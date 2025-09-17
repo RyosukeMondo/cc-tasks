@@ -1,0 +1,10 @@
+{
+  "id": "approval_1758116189470_zc5acf22j",
+  "title": "Requirements for Claude Code Session Content Viewer",
+  "filePath": ".spec-workflow/specs/claude-code-session-viewer/requirements.md",
+  "type": "document",
+  "status": "pending",
+  "createdAt": "2025-09-17T13:36:29.470Z",
+  "category": "spec",
+  "categoryName": "claude-code-session-viewer"
+}

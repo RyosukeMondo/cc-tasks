@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useParams } from "next/navigation";
 
 import { SessionList } from "@/components/projects/SessionList";
+import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
 import { sessionService } from "@/lib/services/sessionService";
 import { projectService } from "@/lib/services/projectService";
 import { SessionMetadata, Project } from "@/lib/types/project";
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -64,10 +63,6 @@ export default function ProjectDetailPage() {
     console.log(`Selected session: ${sessionId} in project: ${projectId}`);
   }, [projectId]);
 
-  const handleBackToProjects = useCallback(() => {
-    router.push('/projects');
-  }, [router]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -84,26 +79,11 @@ export default function ProjectDetailPage() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100">
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 pb-24 pt-16">
-          <nav className="flex items-center gap-2 text-sm">
-            <Link 
-              href="/projects" 
-              className="text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              Projects
-            </Link>
-            <span className="text-slate-500">/</span>
-            <span className="text-slate-400">Error</span>
-          </nav>
+          <ProjectNavigation currentProjectName="Error" />
 
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-8 text-center">
             <h1 className="text-xl font-bold text-rose-200 mb-2">Project Not Found</h1>
             <p className="text-sm text-rose-300 mb-4">{error}</p>
-            <button
-              onClick={handleBackToProjects}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-            >
-              Back to Projects
-            </button>
           </div>
         </div>
       </div>
@@ -118,32 +98,19 @@ export default function ProjectDetailPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 pb-24 pt-16">
         {/* Navigation breadcrumbs */}
-        <nav className="flex items-center gap-2 text-sm">
-          <Link 
-            href="/projects" 
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            Projects
-          </Link>
-          <span className="text-slate-500">/</span>
-          <span className="text-white font-medium">{project.name}</span>
-        </nav>
+        <ProjectNavigation 
+          currentProjectName={project.name}
+          currentProjectId={project.id}
+          showBackButton={true}
+        />
 
         {/* Project header */}
         <header className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-white">{project.name}</h1>
-              <p className="text-sm text-slate-400">
-                {project.description || "Claude Code project sessions and conversations"}
-              </p>
-            </div>
-            <button
-              onClick={handleBackToProjects}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors border border-slate-700"
-            >
-              Back to Projects
-            </button>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-white">{project.name}</h1>
+            <p className="text-sm text-slate-400">
+              {project.description || "Claude Code project sessions and conversations"}
+            </p>
           </div>
 
           {/* Project metadata */}
