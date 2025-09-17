@@ -9,7 +9,7 @@
   - _Requirements: Requirement 1, Requirement 2_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: TypeScript Developer specializing in type systems and interfaces | Task: Create comprehensive TypeScript interfaces for Project, SessionMetadata, and ProjectMeta following Requirements 1 and 2, extending existing type patterns from lib/types/task.ts | Restrictions: Do not modify existing type files, maintain backward compatibility, follow project naming conventions | _Leverage: Follow StatusToken pattern from lib/types/task.ts, use similar structure and naming conventions | _Requirements: Requirement 1 (project visibility), Requirement 2 (project metadata display) | Success: All interfaces compile without errors, proper TypeScript typing, compatible with existing codebase patterns | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 2. Create project service in lib/services/projectService.ts
+- [x] 2. Create project service in lib/services/projectService.ts
   - File: lib/services/projectService.ts
   - Implement file system scanning and project metadata extraction
   - Follow service patterns from lib/services/taskService.ts
