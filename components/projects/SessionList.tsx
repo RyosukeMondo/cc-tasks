@@ -51,7 +51,7 @@ export function SessionList({
             <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
               <div className="space-y-2">
                 <p className="font-medium">No sessions found</p>
-                <p>This project doesn't have any Claude Code conversation sessions yet.</p>
+                <p>This project doesn&apos;t have any Claude Code conversation sessions yet.</p>
               </div>
             </div>
           )}

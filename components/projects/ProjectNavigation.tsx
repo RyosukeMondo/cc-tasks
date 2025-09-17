@@ -37,7 +37,7 @@ export function ProjectNavigation({
         {currentProjectName && (
           <>
             <span className="text-slate-500" aria-hidden="true">/</span>
-            <span className="text-white font-medium" aria-current="page">
+            <span className="text-white font-medium" aria-current="page" title={currentProjectId ?? undefined}>
               {currentProjectName}
             </span>
           </>

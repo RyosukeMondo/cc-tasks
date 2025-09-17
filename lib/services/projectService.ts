@@ -145,6 +145,9 @@ export const projectService: ProjectService = {
       
       // Try to read meta.json for additional metadata
       const metaData = await readProjectMeta(validatedPath);
+      const description = (typeof metaData?.description === 'string' && metaData.description.trim().length > 0)
+        ? metaData.description.trim()
+        : undefined;
       
       return {
         name: metaData?.name || projectName,
@@ -152,6 +155,7 @@ export const projectService: ProjectService = {
         lastModified: stats.mtime.toISOString(),
         sessionCount,
         lastActivity,
+        description,
       };
     } catch (error) {
       console.error(`Failed to extract metadata for project ${projectName}:`, error);
@@ -188,6 +192,7 @@ export const projectService: ProjectService = {
             lastModified: meta.lastModified,
             sessionCount: meta.sessionCount,
             lastActivity: meta.lastActivity,
+            description: meta.description,
             hasValidMeta: await readProjectMeta(projectPath) !== null,
           };
           
@@ -223,3 +228,6 @@ export const projectService: ProjectService = {
 };
 
 export const mockProjectService = projectService;
+
+
+

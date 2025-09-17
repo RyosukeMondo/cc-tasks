@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import type { Stats as FsStats } from 'fs';
 import path from 'path';
 import os from 'os';
 
@@ -167,7 +168,7 @@ export async function isDirectoryAccessible(dirPath: string): Promise<boolean> {
  * @param filePath - The file path to get stats for
  * @returns Promise resolving to file stats or null if inaccessible
  */
-export async function getFileStats(filePath: string): Promise<fs.Stats | null> {
+export async function getFileStats(filePath: string): Promise<FsStats | null> {
   try {
     return await fs.stat(filePath);
   } catch (error) {
@@ -302,3 +303,5 @@ export function getSessionFilePath(projectId: string, sessionFileName: string): 
   
   return path.join(projectPath, 'conversations', validatedFileName);
 }
+
+

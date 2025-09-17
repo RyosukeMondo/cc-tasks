@@ -9,7 +9,7 @@
   - _Requirements: Requirement 1, Requirement 2_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: TypeScript Developer specializing in type systems and conversation data modeling | Task: Create comprehensive TypeScript interfaces for ConversationEntry, EntryMetadata, and SessionStats following Requirements 1 and 2, extending existing type patterns from project and task types | Restrictions: Do not modify existing type files, maintain compatibility with JSONL parsing, follow project naming conventions | _Leverage: Follow patterns from lib/types/project.ts and lib/types/task.ts for consistent naming and structure | _Requirements: Requirement 1 (session content display), Requirement 2 (entry type distinction) | Success: All interfaces compile without errors, support all conversation entry types, compatible with JSONL structure | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 2. Create conversation service in lib/services/conversationService.ts
+- [x] 2. Create conversation service in lib/services/conversationService.ts
   - File: lib/services/conversationService.ts
   - Implement JSONL parsing and conversation entry extraction
   - Follow service patterns from lib/services/projectService.ts

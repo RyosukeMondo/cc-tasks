@@ -99,7 +99,7 @@
   - _Requirements: All requirements (error handling)_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Backend Developer with expertise in file system security and error handling | Task: Create utility functions for file path validation and error handling covering all requirements, ensuring secure file system access limited to Claude projects directory | Restrictions: Must prevent directory traversal attacks, validate all file paths, provide meaningful error messages | _Leverage: Use Node.js path utilities for safe path operations | _Requirements: All requirements (comprehensive error handling) | Success: Utilities prevent security issues, provide clear error messages, handle all edge cases | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 12. Integration testing and final polish
+- [~] 12. Integration testing and final polish
   - Files: All components and services
   - End-to-end testing of project discovery flow
   - Performance optimization and error boundary testing

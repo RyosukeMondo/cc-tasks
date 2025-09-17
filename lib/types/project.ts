@@ -4,6 +4,7 @@ export type ProjectMeta = {
   lastModified: string;
   sessionCount: number;
   lastActivity?: string;
+  description?: string;
 };
 
 export type SessionMetadata = {
@@ -24,5 +25,6 @@ export type Project = {
   lastModified: string;
   sessionCount: number;
   lastActivity?: string;
+  description?: string;
   hasValidMeta: boolean;
 };

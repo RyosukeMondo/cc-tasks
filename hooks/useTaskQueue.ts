@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -22,20 +22,27 @@ export function useTaskQueue(): UseTaskQueueResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const sortTasks = useCallback((list: Task[]): Task[] => {
+    return [...list].sort(
+      (a, b) => new Date(b.createdAtIso).getTime() - new Date(a.createdAtIso).getTime(),
+    );
+  }, []);
+
   const loadTasks = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const data = await taskService.listTasks();
-      setTasks(data);
-      setSelectedTaskId((current) => current ?? data[0]?.id ?? null);
+      const ordered = sortTasks(data);
+      setTasks(ordered);
+      setSelectedTaskId((current) => current ?? ordered[0]?.id ?? null);
     } catch (err) {
       const fallback = err instanceof Error ? err : new Error("Failed to load tasks");
       setError(fallback);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [sortTasks]);
 
   useEffect(() => {
     void loadTasks();
@@ -53,9 +60,24 @@ export function useTaskQueue(): UseTaskQueueResult {
     setSelectedTaskId(taskId);
   }, []);
 
-  const queueTask = useCallback(async (draft: QueueTaskDraft) => {
-    await taskService.queueTask(draft);
-  }, []);
+  const queueTask = useCallback(
+    async (draft: QueueTaskDraft) => {
+      setError(null);
+      try {
+        const newTask = await taskService.queueTask(draft);
+        setTasks((current) => {
+          const withoutDuplicate = current.filter((task) => task.id !== newTask.id);
+          return sortTasks([newTask, ...withoutDuplicate]);
+        });
+        setSelectedTaskId(newTask.id);
+      } catch (err) {
+        const fallback = err instanceof Error ? err : new Error("Failed to queue task");
+        setError(fallback);
+        throw fallback;
+      }
+    },
+    [sortTasks],
+  );
 
   return {
     tasks,

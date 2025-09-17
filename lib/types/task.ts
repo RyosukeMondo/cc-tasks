@@ -1,9 +1,10 @@
-﻿export type TaskStatus = "queued" | "processing" | "pause" | "aborted" | "completed";
+export type TaskStatus = "queued" | "processing" | "paused" | "aborted" | "completed";
 
 export type TaskSession = {
   id: string;
   status: TaskStatus;
   startedAt: string;
+  startedAtIso?: string;
   summary: string;
   tokenCount: number;
 };
@@ -14,6 +15,7 @@ export type Task = {
   completionCondition: string;
   status: TaskStatus;
   createdAt: string;
+  createdAtIso: string;
   sessions: TaskSession[];
 };
 

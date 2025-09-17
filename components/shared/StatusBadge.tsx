@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { TaskStatus } from "@/lib/types/task";
 
@@ -11,7 +11,7 @@ type StatusToken = {
 const STATUS_TOKENS: Record<TaskStatus, StatusToken> = {
   queued: { label: "Queued", hue: "bg-blue-500/20", text: "text-blue-300" },
   processing: { label: "Processing", hue: "bg-amber-500/20", text: "text-amber-300" },
-  pause: { label: "Paused", hue: "bg-slate-500/20", text: "text-slate-200" },
+  paused: { label: "Paused", hue: "bg-slate-500/20", text: "text-slate-200" },
   aborted: { label: "Aborted", hue: "bg-rose-500/20", text: "text-rose-300" },
   completed: { label: "Completed", hue: "bg-emerald-500/20", text: "text-emerald-300" },
 };
@@ -32,3 +32,4 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     </span>
   );
 }
+

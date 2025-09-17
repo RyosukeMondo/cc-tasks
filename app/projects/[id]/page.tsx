@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { SessionList } from "@/components/projects/SessionList";
@@ -33,11 +33,10 @@ export default function ProjectDetailPage() {
         // Load project metadata and sessions in parallel
         const [projectList, sessionList] = await Promise.all([
           projectService.listProjects(),
-          sessionService.listSessionsForProject(projectId)
+          sessionService.listSessionsForProject(projectId),
         ]);
 
-        // Find the specific project
-        const foundProject = projectList.find(p => p.id === projectId);
+        const foundProject = projectList.find((item) => item.id === projectId);
         if (!foundProject) {
           setError(`Project "${projectId}" not found`);
           setIsLoading(false);
@@ -47,21 +46,32 @@ export default function ProjectDetailPage() {
         setProject(foundProject);
         setSessions(sessionList);
       } catch (err) {
-        console.error('Failed to load project details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load project details');
+        console.error("Failed to load project details:", err);
+        setError(err instanceof Error ? err.message : "Failed to load project details");
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadProjectAndSessions();
+    void loadProjectAndSessions();
   }, [projectId]);
 
-  const handleSessionSelect = useCallback((sessionId: string) => {
-    // For now, we'll log the session selection
-    // In the future, this could navigate to a session detail view
-    console.log(`Selected session: ${sessionId} in project: ${projectId}`);
-  }, [projectId]);
+  const handleSessionSelect = useCallback(
+    (sessionId: string) => {
+      console.log(`Selected session: ${sessionId} in project: ${projectId}`);
+    },
+    [projectId],
+  );
+
+  const projectDescription = useMemo(() => {
+    if (!project) {
+      return "";
+    }
+
+    return (
+      project.description ?? project.meta.description ?? "Claude Code project sessions and conversations"
+    );
+  }, [project]);
 
   if (isLoading) {
     return (
@@ -82,8 +92,8 @@ export default function ProjectDetailPage() {
           <ProjectNavigation currentProjectName="Error" />
 
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-8 text-center">
-            <h1 className="text-xl font-bold text-rose-200 mb-2">Project Not Found</h1>
-            <p className="text-sm text-rose-300 mb-4">{error}</p>
+            <h1 className="mb-2 text-xl font-bold text-rose-200">Project Not Found</h1>
+            <p className="text-sm text-rose-300">{error}</p>
           </div>
         </div>
       </div>
@@ -94,50 +104,54 @@ export default function ProjectDetailPage() {
     return null;
   }
 
+  const sessionsRecorded = sessions.length;
+  const metadataSessions = project.sessionCount;
+  const metadataStatusLabel = project.hasValidMeta ? "meta.json detected" : "meta.json missing";
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 pb-24 pt-16">
-        {/* Navigation breadcrumbs */}
-        <ProjectNavigation 
+        <ProjectNavigation
           currentProjectName={project.name}
           currentProjectId={project.id}
           showBackButton={true}
         />
 
-        {/* Project header */}
         <header className="space-y-4">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-white">{project.name}</h1>
-            <p className="text-sm text-slate-400">
-              {project.description || "Claude Code project sessions and conversations"}
-            </p>
+            <p className="text-sm text-slate-400">{projectDescription}</p>
+            <p className="font-mono text-xs text-slate-500">{project.path}</p>
           </div>
 
-          {/* Project metadata */}
-          <div className="flex items-center gap-6 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-6 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <span className="font-medium">Project ID:</span>
-              <code className="px-2 py-1 bg-slate-800 rounded text-slate-300">
-                {project.id}
-              </code>
+              <code className="rounded bg-slate-800 px-2 py-1 text-slate-300">{project.id}</code>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-medium">Sessions:</span>
-              <span className="text-slate-300">{sessions.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Last Activity:</span>
               <span className="text-slate-300">
-                {project.lastActivity 
-                  ? new Date(project.lastActivity).toLocaleDateString()
-                  : "No activity"
-                }
+                {sessionsRecorded}
+                {metadataSessions !== sessionsRecorded && ` (catalogued ${metadataSessions})`}
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Last activity:</span>
+              <span className="text-slate-300">
+                {project.lastActivity ? new Date(project.lastActivity).toLocaleString() : "No activity"}
+              </span>
+            </div>
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] uppercase tracking-widest ${
+                project.hasValidMeta ? "bg-emerald-500/20 text-emerald-200" : "bg-amber-500/20 text-amber-200"
+              }`}
+            >
+              {metadataStatusLabel}
+            </span>
           </div>
         </header>
-        
-        {/* Sessions list */}
+
         <main className="flex-1">
           <SessionList
             sessions={sessions}
@@ -151,3 +165,5 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
+
+

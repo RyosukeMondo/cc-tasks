@@ -83,18 +83,21 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           <p className="text-sm text-slate-400 truncate mt-1">
             {project.path}
           </p>
+          {project.description && (
+            <p className="mt-3 line-clamp-2 text-xs text-slate-400">
+              {project.description}
+            </p>
+          )}
         </div>
         <ProjectStatusBadge status={status} />
       </div>
       
       <div className="mt-4 flex items-center justify-between text-sm">
-        <div className="flex items-center gap-4">
-          <div className="text-slate-300">
-            <span className="font-medium">{project.sessionCount}</span>
-            <span className="text-slate-400 ml-1">
-              {project.sessionCount === 1 ? "session" : "sessions"}
-            </span>
-          </div>
+        <div className="text-slate-300">
+          <span className="font-medium">{project.sessionCount}</span>
+          <span className="text-slate-400 ml-1">
+            {project.sessionCount === 1 ? "session" : "sessions"}
+          </span>
         </div>
         
         <div className="text-slate-400">
