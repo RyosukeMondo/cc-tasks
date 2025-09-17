@@ -72,7 +72,7 @@
   - _Requirements: Requirement 1, Requirement 3_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in scrollable content and conversation UI | Task: Create ConversationViewer component following Requirements 1 and 3, implementing main conversation display container with efficient scrolling and navigation | Restrictions: Must handle large conversations efficiently, maintain scroll performance, provide smooth user experience | _Leverage: Use EntryCard component for entry rendering, follow existing list rendering patterns | _Requirements: Requirement 1 (conversation display), Requirement 3 (navigation through conversations) | Success: Component renders conversations smoothly, handles large content efficiently, navigation controls functional | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 9. Create conversation navigation component in components/conversations/ConversationNavigation.tsx
+- [x] 9. Create conversation navigation component in components/conversations/ConversationNavigation.tsx
   - File: components/conversations/ConversationNavigation.tsx
   - Navigation controls for jumping to conversation positions and progress indication
   - Handle scroll position management and conversation stats display
@@ -81,7 +81,7 @@
   - _Requirements: Requirement 3, Requirement 4_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in navigation components and scroll management | Task: Create ConversationNavigation component following Requirements 3 and 4, implementing navigation controls for conversation positioning and progress tracking | Restrictions: Must maintain scroll position accurately, provide intuitive navigation, ensure accessibility compliance | _Leverage: Use existing navigation patterns and scroll management utilities | _Requirements: Requirement 3 (conversation navigation), Requirement 4 (clear navigation between views) | Success: Navigation controls work smoothly, progress indication accurate, scroll position maintained | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 10. Create session content page in app/projects/[id]/sessions/[sessionId]/page.tsx
+- [x] 10. Create session content page in app/projects/[id]/sessions/[sessionId]/page.tsx
   - File: app/projects/[id]/sessions/[sessionId]/page.tsx
   - Dynamic route for individual session content viewing
   - Integrate ConversationViewer with conversation service data
