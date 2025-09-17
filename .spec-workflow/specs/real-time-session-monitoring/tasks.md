@@ -45,7 +45,7 @@
   - _Requirements: Requirement 4_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in React hooks and real-time data management | Task: Create monitoring hook following Requirement 4, implementing automatic updates and state management using patterns from useTaskQueue and integrating with monitoringService | Restrictions: Must handle component unmounting safely, prevent memory leaks, manage polling lifecycle properly | _Leverage: Follow subscription and polling patterns from useTaskQueue.ts, integrate with monitoringService for data updates | _Requirements: Requirement 4 (live update mechanism) | Success: Hook provides reliable real-time data, handles lifecycle correctly, memory efficient with proper cleanup | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 6. Create session status indicator component in components/monitoring/SessionStatusIndicator.tsx
+- [x] 6. Create session status indicator component in components/monitoring/SessionStatusIndicator.tsx
   - File: components/monitoring/SessionStatusIndicator.tsx
   - Visual indicator component for live session states (Active, Idle, Stalled, etc.)
   - Support different status types with appropriate colors and animations
