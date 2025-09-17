@@ -81,7 +81,7 @@
   - _Requirements: Requirement 1, Requirement 5_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in component enhancement and real-time data integration | Task: Enhance existing SessionCard following Requirements 1 and 5, adding real-time status indicators and control actions while maintaining existing functionality | Restrictions: Must not break existing SessionCard functionality, maintain consistent styling, ensure smooth integration of monitoring features | _Leverage: Integrate SessionStatusIndicator and control components with existing SessionCard structure | _Requirements: Requirement 1 (live session state), Requirement 5 (session controls) | Success: Session cards show live status updates, controls are accessible, existing functionality preserved | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 10. Create monitoring dashboard page in app/projects/[id]/monitoring/page.tsx
+- [x] 10. Create monitoring dashboard page in app/projects/[id]/monitoring/page.tsx
   - File: app/projects/[id]/monitoring/page.tsx
   - Main monitoring dashboard displaying all active sessions for a project
   - Integrate all monitoring components with real-time updates
@@ -90,7 +90,7 @@
   - _Requirements: Requirement 1, Requirement 4_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Full-stack Developer with expertise in dashboard interfaces and real-time data visualization | Task: Create monitoring dashboard page following Requirements 1 and 4, integrating all monitoring components to provide comprehensive session oversight with live updates | Restrictions: Must handle multiple sessions efficiently, provide clear navigation, maintain performance with real-time updates | _Leverage: Use useSessionMonitoring hook and all monitoring components for complete dashboard functionality | _Requirements: Requirement 1 (session state display), Requirement 4 (live updates) | Success: Dashboard displays all session information clearly, real-time updates work smoothly, navigation is intuitive | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 11. Add monitoring navigation to project layout in app/projects/[id]/layout.tsx
+- [x] 11. Add monitoring navigation to project layout in app/projects/[id]/layout.tsx
   - File: app/projects/[id]/layout.tsx (modify existing)
   - Add "Monitoring" navigation option to existing project navigation
   - Ensure consistent navigation experience across project features
