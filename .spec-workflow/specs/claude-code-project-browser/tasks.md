@@ -36,7 +36,7 @@
   - _Requirements: Requirement 1, Requirement 2_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in React component architecture and reusable UI patterns | Task: Create ProjectCard component following Requirements 1 and 2, displaying project summary with session counts and activity status using StatusBadge patterns | Restrictions: Must use existing component patterns, maintain design consistency, ensure responsive design | _Leverage: Adapt StatusBadge.tsx for project activity status, follow card layout patterns from existing components | _Requirements: Requirement 1 (project display), Requirement 2 (metadata visibility) | Success: Component renders project information clearly, reuses existing styling patterns, responsive and accessible | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 5. Create ProjectList component in components/projects/ProjectList.tsx
+- [x] 5. Create ProjectList component in components/projects/ProjectList.tsx
   - File: components/projects/ProjectList.tsx
   - Render grid/list of ProjectCard components with loading and error states
   - Handle empty states when no projects found
