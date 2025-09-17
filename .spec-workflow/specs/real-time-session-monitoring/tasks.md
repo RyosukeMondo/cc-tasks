@@ -27,7 +27,7 @@
   - _Requirements: Requirement 5_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Systems Developer with expertise in process management and session control | Task: Implement session control operations following Requirement 5, providing pause/resume/terminate functionality with robust error handling and process management | Restrictions: Must ensure safe process termination, handle permission errors gracefully, prevent data corruption during operations | _Leverage: Adapt process management patterns from taskService.ts for Claude Code session control | _Requirements: Requirement 5 (session interaction controls) | Success: All control operations work reliably, error handling is comprehensive, operations are safe and reversible where appropriate | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 4. Create monitoring service in lib/services/monitoringService.ts
+- [x] 4. Create monitoring service in lib/services/monitoringService.ts
   - File: lib/services/monitoringService.ts
   - Central service orchestrating session detection, state tracking, and updates
   - Implement polling mechanism with configurable intervals
