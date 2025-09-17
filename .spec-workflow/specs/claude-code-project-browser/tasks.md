@@ -27,7 +27,7 @@
   - _Requirements: Requirement 3_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Backend Developer with expertise in file system operations and metadata extraction | Task: Implement sessionService for session file metadata extraction following Requirement 3, handling JSONL file discovery and file information | Restrictions: No content parsing of JSONL files, metadata only (file size, dates), read-only access | _Leverage: Follow service patterns from taskService.ts, use Node.js fs/promises for file stats | _Requirements: Requirement 3 (session navigation and metadata) | Success: Service can list session files, extract file metadata, handle corrupted/missing files gracefully | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 4. Create ProjectCard component in components/projects/ProjectCard.tsx
+- [x] 4. Create ProjectCard component in components/projects/ProjectCard.tsx
   - File: components/projects/ProjectCard.tsx
   - Display individual project summary with session count and activity status
   - Reuse StatusBadge patterns for project activity indication
