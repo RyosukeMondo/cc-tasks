@@ -1,6 +1,6 @@
 # Tasks Document
 
-- [ ] 1. Create monitoring data types in lib/types/monitoring.ts
+- [x] 1. Create monitoring data types in lib/types/monitoring.ts
   - File: lib/types/monitoring.ts
   - Define TypeScript interfaces for SessionState, MonitoringUpdate, and SessionControls
   - Extend existing patterns from lib/types/task.ts and lib/types/conversation.ts
