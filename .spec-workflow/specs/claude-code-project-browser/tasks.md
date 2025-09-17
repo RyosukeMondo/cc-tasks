@@ -18,7 +18,7 @@
   - _Requirements: Requirement 1, Requirement 2_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Backend Developer with expertise in Node.js file system operations and service architecture | Task: Implement projectService with file system scanning and metadata extraction following Requirements 1 and 2, using service patterns from lib/services/taskService.ts | Restrictions: Read-only access to ~/.claude/projects/, no write operations, graceful error handling for missing directories | _Leverage: Follow interface pattern from taskService.ts, use Node.js fs/promises for file operations | _Requirements: Requirement 1 (project discovery), Requirement 2 (metadata extraction) | Success: Service can scan projects directory, extract metadata, handle errors gracefully, follows existing service patterns | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 3. Create session service in lib/services/sessionService.ts
+- [x] 3. Create session service in lib/services/sessionService.ts
   - File: lib/services/sessionService.ts
   - Implement session file metadata extraction (no content parsing)
   - Handle JSONL file discovery and basic file information
