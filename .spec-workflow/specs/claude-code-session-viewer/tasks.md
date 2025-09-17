@@ -18,7 +18,7 @@
   - _Requirements: Requirement 1, Requirement 5_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Backend Developer with expertise in file parsing and content validation | Task: Implement conversationService with secure JSONL parsing and content validation following Requirements 1 and 5, using service patterns from existing project services | Restrictions: Must handle malformed JSONL gracefully, prevent XSS attacks, limit memory usage for large files | _Leverage: Follow validation patterns from projectService.ts and sessionService.ts, use Node.js fs/promises for file operations | _Requirements: Requirement 1 (conversation parsing), Requirement 5 (content formatting) | Success: Service can parse JSONL safely, handle corrupted files, extract conversation entries with metadata | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 3. Create entry card component in components/conversations/EntryCard.tsx
+- [x] 3. Create entry card component in components/conversations/EntryCard.tsx
   - File: components/conversations/EntryCard.tsx
   - Polymorphic component for rendering different conversation entry types
   - Handle user, assistant, tool_use, and tool_result entries with distinct styling
@@ -27,7 +27,7 @@
   - _Requirements: Requirement 2_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer specializing in polymorphic React components and conversation UI | Task: Create EntryCard component following Requirement 2, implementing polymorphic rendering for different conversation entry types with distinct visual styling | Restrictions: Must use existing design patterns, ensure accessibility, handle all entry types safely | _Leverage: Adapt StatusBadge patterns for entry type indication, follow existing card layout patterns | _Requirements: Requirement 2 (visual entry type distinction) | Success: Component renders all entry types correctly, visual distinction clear, reusable and accessible | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 4. Create user message component in components/conversations/UserMessage.tsx
+- [x] 4. Create user message component in components/conversations/UserMessage.tsx
   - File: components/conversations/UserMessage.tsx
   - Display user input messages with proper styling and metadata
   - Handle content sanitization and timestamp formatting
