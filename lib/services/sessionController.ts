@@ -14,6 +14,8 @@ import {
 const execAsync = promisify(exec);
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const CONTROL_TIMEOUT = 30000; // 30 seconds timeout for control operations
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
 
 export type SessionController = {
   getSessionControls: (projectId: string, sessionId: string) => Promise<SessionControls>;
@@ -56,49 +58,58 @@ async function isSessionAccessible(projectId: string, sessionId: string): Promis
 }
 
 /**
- * Finds process IDs for Claude Code sessions
+ * Finds process IDs for Claude Code sessions with enhanced error handling
  */
 async function findClaudeProcesses(): Promise<number[]> {
+  const processes: number[] = [];
+  
+  // Check for processes containing 'claude' in the command line
   try {
-    // Try to find Claude Code processes using different approaches
-    const processes: number[] = [];
-    
-    // Check for processes containing 'claude' in the command line
-    try {
-      const { stdout } = await execAsync('pgrep -f "claude"', { timeout: 5000 });
-      const pids = stdout.trim().split('\n')
-        .filter(line => line.trim())
-        .map(pid => parseInt(pid.trim(), 10))
-        .filter(pid => !isNaN(pid));
-      processes.push(...pids);
-    } catch {
-      // Ignore errors from pgrep (process might not exist on all systems)
+    const { stdout } = await execAsync('pgrep -f "claude"', { 
+      timeout: 5000,
+      maxBuffer: 1024 * 1024 // 1MB buffer limit
+    });
+    const pids = stdout.trim().split('\n')
+      .filter(line => line.trim())
+      .map(pid => parseInt(pid.trim(), 10))
+      .filter(pid => !isNaN(pid) && pid > 0);
+    processes.push(...pids);
+  } catch (error) {
+    // Log only if it's not a "no processes found" error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (!errorMessage.includes('Command failed') || !errorMessage.includes('exit code 1')) {
+      console.warn('pgrep command failed:', errorMessage);
     }
-    
-    // On macOS/Linux, also try finding by process name
-    if (process.platform !== 'win32') {
-      try {
-        const { stdout } = await execAsync('ps aux | grep -i claude | grep -v grep', { timeout: 5000 });
-        const lines = stdout.trim().split('\n').filter(line => line.trim());
-        for (const line of lines) {
+  }
+  
+  // On macOS/Linux, also try finding by process name with fallback
+  if (process.platform !== 'win32') {
+    try {
+      const { stdout } = await execAsync('ps aux | grep -i claude | grep -v grep', { 
+        timeout: 5000,
+        maxBuffer: 1024 * 1024
+      });
+      const lines = stdout.trim().split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        try {
           const parts = line.trim().split(/\s+/);
           if (parts.length >= 2) {
             const pid = parseInt(parts[1], 10);
-            if (!isNaN(pid) && !processes.includes(pid)) {
+            if (!isNaN(pid) && pid > 0 && !processes.includes(pid)) {
               processes.push(pid);
             }
           }
+        } catch (lineError) {
+          console.warn('Error parsing process line:', line, lineError);
         }
-      } catch {
-        // Ignore errors
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('ps command failed:', errorMessage);
     }
-    
-    return processes;
-  } catch (error) {
-    console.error('Failed to find Claude processes:', error);
-    return [];
   }
+  
+  return processes;
 }
 
 /**
@@ -115,7 +126,7 @@ async function signalProcess(pid: number, signal: NodeJS.Signals): Promise<boole
 }
 
 /**
- * Creates a session control marker file
+ * Creates a session control marker file with retry logic
  */
 async function createControlMarker(
   projectId: string, 
@@ -123,28 +134,54 @@ async function createControlMarker(
   action: SessionControlAction, 
   reason?: string
 ): Promise<void> {
-  try {
-    const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
-    const validatedPath = validateProjectPath(projectPath);
-    const controlDir = path.join(validatedPath, '.control');
-    
-    // Ensure control directory exists
-    await fs.mkdir(controlDir, { recursive: true });
-    
-    const markerFile = path.join(controlDir, `${sessionId}.${action}`);
-    const markerData = {
-      action,
-      sessionId,
-      projectId,
-      timestamp: new Date().toISOString(),
-      reason: reason || `Session ${action} requested`
-    };
-    
-    await fs.writeFile(markerFile, JSON.stringify(markerData, null, 2));
-  } catch (error) {
-    console.error(`Failed to create control marker for ${action}:`, error);
-    throw error;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
+      const validatedPath = validateProjectPath(projectPath);
+      const controlDir = path.join(validatedPath, '.control');
+      
+      // Ensure control directory exists with error handling
+      try {
+        await fs.mkdir(controlDir, { recursive: true });
+      } catch (mkdirError) {
+        // Check if directory already exists
+        const stats = await fs.stat(controlDir).catch(() => null);
+        if (!stats?.isDirectory()) {
+          throw mkdirError;
+        }
+      }
+      
+      const markerFile = path.join(controlDir, `${sessionId}.${action}`);
+      const markerData = {
+        action,
+        sessionId,
+        projectId,
+        timestamp: new Date().toISOString(),
+        reason: reason || `Session ${action} requested`,
+        attempt: attempt + 1
+      };
+      
+      await fs.writeFile(markerFile, JSON.stringify(markerData, null, 2), { mode: 0o644 });
+      return; // Success, exit the retry loop
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error creating marker');
+      
+      // Don't retry for permission errors or invalid paths
+      if (lastError.message.includes('EACCES') || lastError.message.includes('Invalid project path')) {
+        break;
+      }
+      
+      // Wait before retry with exponential backoff
+      if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt)));
+      }
+    }
   }
+  
+  console.error(`Failed to create control marker for ${action} after ${MAX_RETRY_ATTEMPTS} attempts:`, lastError);
+  throw lastError || new Error('Failed to create control marker');
 }
 
 /**

@@ -11,6 +11,16 @@ import {
 } from "@/lib/types/monitoring";
 import { monitoringService } from "@/lib/services/monitoringService";
 
+type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+type ErrorInfo = {
+  error: Error;
+  severity: ErrorSeverity;
+  timestamp: Date;
+  operation: string;
+  retryable: boolean;
+};
+
 type UseSessionMonitoringResult = {
   monitoringData: MonitoringData | null;
   sessions: MonitoringUpdate[];
@@ -21,21 +31,72 @@ type UseSessionMonitoringResult = {
   startMonitoring: (config?: Partial<MonitoringConfig>) => Promise<void>;
   stopMonitoring: () => Promise<void>;
   refresh: () => Promise<void>;
+  retryOperation: () => Promise<void>;
+  clearError: () => void;
   isMonitoring: boolean;
   isLoading: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
+  connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'error';
+  consecutiveFailures: number;
 };
+
+const ERROR_CONFIG = {
+  MAX_RETRY_ATTEMPTS: 3,
+  RETRY_DELAY_MS: 2000,
+  EXPONENTIAL_BACKOFF_BASE: 2,
+  CONNECTION_TIMEOUT: 10000,
+  MAX_CONSECUTIVE_FAILURES: 5,
+  CIRCUIT_BREAKER_TIMEOUT: 30000
+};
+
+function classifyError(error: Error, operation: string): ErrorInfo {
+  const message = error.message.toLowerCase();
+  let severity: ErrorSeverity = 'medium';
+  let retryable = true;
+  
+  if (message.includes('network') || message.includes('fetch') || message.includes('timeout')) {
+    severity = 'medium';
+    retryable = true;
+  } else if (message.includes('unauthorized') || message.includes('forbidden')) {
+    severity = 'high';
+    retryable = false;
+  } else if (message.includes('not found') || message.includes('invalid project')) {
+    severity = 'high';
+    retryable = false;
+  } else if (message.includes('permission') || message.includes('access')) {
+    severity = 'critical';
+    retryable = false;
+  } else if (message.includes('server error') || message.includes('internal error')) {
+    severity = 'high';
+    retryable = true;
+  }
+  
+  return {
+    error,
+    severity,
+    timestamp: new Date(),
+    operation,
+    retryable
+  };
+}
 
 export function useSessionMonitoring(projectId: string): UseSessionMonitoringResult {
   const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [lastSuccessTime, setLastSuccessTime] = useState<Date | null>(null);
   
   // Use ref to store polling interval to handle cleanup properly
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastOperationRef = useRef<string | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -44,6 +105,10 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
       }
     };
   }, []);
@@ -55,13 +120,77 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     );
   }, []);
 
-  // Load monitoring data from service
+  // Enhanced retry mechanism with exponential backoff
+  const executeWithRetry = useCallback(async <T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxAttempts: number = ERROR_CONFIG.MAX_RETRY_ATTEMPTS
+  ): Promise<T> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        if (!mountedRef.current) {
+          throw new Error('Component unmounted');
+        }
+        
+        setConnectionStatus(attempt === 1 ? 'connecting' : 'connecting');
+        const result = await operation();
+        
+        // Success - reset failure tracking
+        setConsecutiveFailures(0);
+        setLastSuccessTime(new Date());
+        setConnectionStatus('connected');
+        setError(null);
+        setErrorInfo(null);
+        
+        return result;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        
+        // Classify error
+        const errorInfo = classifyError(lastError, operationName);
+        
+        // Don't retry for certain error types
+        if (!errorInfo.retryable || attempt === maxAttempts) {
+          break;
+        }
+        
+        // Wait before retry with exponential backoff
+        const delay = ERROR_CONFIG.RETRY_DELAY_MS * Math.pow(ERROR_CONFIG.EXPONENTIAL_BACKOFF_BASE, attempt - 1);
+        await new Promise(resolve => {
+          retryTimeoutRef.current = setTimeout(resolve, delay);
+        });
+      }
+    }
+    
+    // All retries failed
+    if (lastError) {
+      const newConsecutiveFailures = consecutiveFailures + 1;
+      setConsecutiveFailures(newConsecutiveFailures);
+      setConnectionStatus('error');
+      
+      const errorInfo = classifyError(lastError, operationName);
+      setError(lastError);
+      setErrorInfo(errorInfo);
+      
+      throw lastError;
+    }
+    
+    throw new Error('Operation failed without error');
+  }, [consecutiveFailures]);
+
+  // Load monitoring data from service with enhanced error handling
   const loadMonitoringData = useCallback(async () => {
     if (!mountedRef.current) return;
     
-    setError(null);
+    lastOperationRef.current = 'loadMonitoringData';
+    
     try {
-      const data = await monitoringService.getMonitoringData(projectId);
+      const data = await executeWithRetry(
+        () => monitoringService.getMonitoringData(projectId),
+        'loadMonitoringData'
+      );
       
       if (!mountedRef.current) return;
       
@@ -80,10 +209,10 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     } catch (err) {
       if (!mountedRef.current) return;
       
-      const fallback = err instanceof Error ? err : new Error("Failed to load monitoring data");
-      setError(fallback);
+      // Error is already handled by executeWithRetry
+      console.warn('Failed to load monitoring data after retries:', err);
     }
-  }, [projectId, selectedSessionId]);
+  }, [projectId, selectedSessionId, executeWithRetry]);
 
   // Start polling for updates
   const startPolling = useCallback((pollInterval: number = 2000) => {
@@ -106,13 +235,17 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     }
   }, []);
 
-  // Start monitoring for the project
+  // Start monitoring for the project with enhanced error handling
   const startMonitoring = useCallback(async (config?: Partial<MonitoringConfig>) => {
     setIsLoading(true);
-    setError(null);
+    lastOperationRef.current = 'startMonitoring';
     
     try {
-      await monitoringService.startMonitoring(projectId, config);
+      await executeWithRetry(
+        () => monitoringService.startMonitoring(projectId, config),
+        'startMonitoring'
+      );
+      
       setIsMonitoring(true);
       
       // Initial data load
@@ -122,33 +255,38 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
       const pollInterval = config?.pollInterval ?? 2000;
       startPolling(pollInterval);
     } catch (err) {
-      const fallback = err instanceof Error ? err : new Error("Failed to start monitoring");
-      setError(fallback);
-      throw fallback;
+      // Error is already handled by executeWithRetry
+      throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, loadMonitoringData, startPolling]);
+  }, [projectId, loadMonitoringData, startPolling, executeWithRetry]);
 
-  // Stop monitoring for the project
+  // Stop monitoring for the project with enhanced error handling
   const stopMonitoring = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
+    lastOperationRef.current = 'stopMonitoring';
     
     try {
-      await monitoringService.stopMonitoring(projectId);
+      await executeWithRetry(
+        () => monitoringService.stopMonitoring(projectId),
+        'stopMonitoring',
+        2 // Fewer retries for stop operations
+      );
+      
       setIsMonitoring(false);
       stopPolling();
       setMonitoringData(null);
       setSelectedSessionId(null);
+      setConnectionStatus('disconnected');
+      setConsecutiveFailures(0);
     } catch (err) {
-      const fallback = err instanceof Error ? err : new Error("Failed to stop monitoring");
-      setError(fallback);
-      throw fallback;
+      // Error is already handled by executeWithRetry
+      throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, stopPolling]);
+  }, [projectId, stopPolling, executeWithRetry]);
 
   // Check if monitoring is active and initialize if needed
   useEffect(() => {
@@ -183,25 +321,68 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     setSelectedSessionId(sessionId);
   }, []);
 
-  // Execute session control operation
+  // Execute session control operation with enhanced error handling
   const executeControl = useCallback(
     async (request: SessionControlRequest) => {
-      setError(null);
+      lastOperationRef.current = `executeControl:${request.action}`;
+      
       try {
-        const result = await monitoringService.executeSessionControl(request);
+        const result = await executeWithRetry(
+          () => monitoringService.executeSessionControl(request),
+          `executeControl:${request.action}`,
+          2 // Fewer retries for control operations
+        );
         
         // Trigger immediate refresh after control operation
-        await loadMonitoringData();
+        try {
+          await loadMonitoringData();
+        } catch (refreshError) {
+          console.warn('Failed to refresh data after control operation:', refreshError);
+        }
         
         return result;
       } catch (err) {
-        const fallback = err instanceof Error ? err : new Error("Failed to execute session control");
-        setError(fallback);
-        throw fallback;
+        // Error is already handled by executeWithRetry
+        throw err;
       }
     },
-    [loadMonitoringData],
+    [loadMonitoringData, executeWithRetry],
   );
+
+  // Retry the last failed operation
+  const retryOperation = useCallback(async () => {
+    if (!lastOperationRef.current) {
+      throw new Error('No operation to retry');
+    }
+    
+    const operation = lastOperationRef.current;
+    setError(null);
+    setErrorInfo(null);
+    
+    try {
+      if (operation === 'loadMonitoringData') {
+        await loadMonitoringData();
+      } else if (operation === 'startMonitoring') {
+        await startMonitoring();
+      } else if (operation === 'stopMonitoring') {
+        await stopMonitoring();
+      } else {
+        throw new Error(`Cannot retry operation: ${operation}`);
+      }
+    } catch (err) {
+      // Errors are handled by individual operations
+      throw err;
+    }
+  }, [loadMonitoringData, startMonitoring, stopMonitoring]);
+
+  // Clear error state
+  const clearError = useCallback(() => {
+    setError(null);
+    setErrorInfo(null);
+    if (consecutiveFailures < ERROR_CONFIG.MAX_CONSECUTIVE_FAILURES) {
+      setConnectionStatus(isMonitoring ? 'connected' : 'disconnected');
+    }
+  }, [consecutiveFailures, isMonitoring]);
 
   // Manual refresh
   const refresh = useCallback(async () => {
@@ -213,6 +394,25 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     }
   }, [loadMonitoringData]);
 
+  // Circuit breaker logic - pause polling if too many failures
+  useEffect(() => {
+    if (consecutiveFailures >= ERROR_CONFIG.MAX_CONSECUTIVE_FAILURES) {
+      console.warn(`Circuit breaker activated: ${consecutiveFailures} consecutive failures`);
+      stopPolling();
+      setConnectionStatus('error');
+      
+      // Auto-retry after timeout
+      retryTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current && isMonitoring) {
+          console.log('Circuit breaker timeout expired, attempting to restore monitoring');
+          setConsecutiveFailures(0);
+          loadMonitoringData().catch(console.error);
+          startPolling();
+        }
+      }, ERROR_CONFIG.CIRCUIT_BREAKER_TIMEOUT);
+    }
+  }, [consecutiveFailures, isMonitoring, loadMonitoringData, startPolling, stopPolling]);
+
   return {
     monitoringData,
     sessions,
@@ -223,8 +423,13 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     startMonitoring,
     stopMonitoring,
     refresh,
+    retryOperation,
+    clearError,
     isMonitoring,
     isLoading,
     error,
+    errorInfo,
+    connectionStatus,
+    consecutiveFailures,
   };
 }

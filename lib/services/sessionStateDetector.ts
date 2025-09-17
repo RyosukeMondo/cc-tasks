@@ -8,6 +8,8 @@ import { ConversationEntry } from '@/lib/types/conversation';
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
 const ERROR_THRESHOLD = 30 * 60 * 1000; // 30 minutes in milliseconds
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
 
 export type SessionStateDetector = {
   detectSessionState: (projectId: string, sessionId: string) => Promise<SessionState>;
@@ -57,16 +59,35 @@ async function getFileModificationTime(filePath: string): Promise<Date | null> {
 }
 
 /**
- * Reads last few lines of a file efficiently
+ * Reads last few lines of a file efficiently with retry logic
  */
 async function readLastLines(filePath: string, lineCount: number = 10): Promise<string[]> {
-  try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    const lines = content.split('\n').filter(line => line.trim());
-    return lines.slice(-lineCount);
-  } catch {
-    return [];
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const lines = content.split('\n').filter(line => line.trim());
+      return lines.slice(-lineCount);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown file read error');
+      
+      // Don't retry for certain errors
+      if (lastError.message.includes('ENOENT') || lastError.message.includes('EACCES')) {
+        break;
+      }
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt)));
+      }
+    }
   }
+  
+  if (lastError) {
+    console.warn(`Failed to read file ${filePath} after ${MAX_RETRY_ATTEMPTS} attempts:`, lastError.message);
+  }
+  return [];
 }
 
 /**
@@ -192,10 +213,15 @@ function getCurrentActivity(entries: ConversationEntry[]): string | undefined {
 
 export const sessionStateDetector: SessionStateDetector = {
   /**
-   * Detects the current state of a session
+   * Detects the current state of a session with enhanced error handling
    */
   async detectSessionState(projectId: string, sessionId: string): Promise<SessionState> {
     try {
+      // Input validation
+      if (!projectId || !sessionId) {
+        throw new Error('Project ID and Session ID are required');
+      }
+      
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
       const validatedPath = validateProjectPath(projectPath);
       const sessionFilePath = path.join(validatedPath, 'conversations', `${sessionId}.jsonl`);
@@ -205,19 +231,31 @@ export const sessionStateDetector: SessionStateDetector = {
         return 'terminated';
       }
       
-      // Get file modification time
+      // Get file modification time with error handling
       const lastModified = await getFileModificationTime(sessionFilePath);
       if (!lastModified) {
+        console.warn(`Unable to get modification time for session ${sessionId}, treating as error state`);
         return 'error';
       }
       
-      // Read recent conversation entries
+      // Read recent conversation entries with retry logic
       const recentLines = await readLastLines(sessionFilePath, 20);
+      if (recentLines.length === 0) {
+        console.warn(`No readable content in session file ${sessionId}, treating as error state`);
+        return 'error';
+      }
+      
       const recentEntries = parseConversationEntries(recentLines);
       
       return analyzeConversationActivity(recentEntries, lastModified);
     } catch (error) {
-      console.error(`Failed to detect session state for ${sessionId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Failed to detect session state for ${sessionId}:`, errorMessage);
+      
+      // Return different error states based on error type
+      if (errorMessage.includes('Invalid project path')) {
+        return 'terminated';
+      }
       return 'error';
     }
   },

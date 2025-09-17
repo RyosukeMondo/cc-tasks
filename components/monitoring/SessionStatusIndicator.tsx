@@ -58,7 +58,8 @@ export function SessionStatusIndicator({
   showLabel = true,
   size = "md"
 }: SessionStatusIndicatorProps) {
-  const token = SESSION_STATUS_TOKENS[status];
+  // Error boundary protection for invalid status values
+  const token = SESSION_STATUS_TOKENS[status] || SESSION_STATUS_TOKENS.error;
   
   const sizeClasses = {
     sm: "px-2 py-0.5 text-xs",
@@ -77,6 +78,7 @@ export function SessionStatusIndicator({
       className={`inline-flex items-center gap-1.5 rounded-full font-medium uppercase tracking-wide ${token.hue} ${token.text} ${sizeClasses[size]} ${className}`}
       role="status"
       aria-label={`Session status: ${token.label}`}
+      title={status !== 'error' ? `Session status: ${token.label}` : `Error state - check session for issues`}
     >
       <span 
         className={`${dotSizes[size]} rounded-full bg-current ${token.pulseClass || ""}`}

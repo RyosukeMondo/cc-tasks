@@ -148,15 +148,66 @@ function ConfirmationModal({ isOpen, action, onConfirm, onCancel }: Confirmation
 type FeedbackMessageProps = {
   result: SessionControlResult | null;
   onDismiss: () => void;
+  onRetry?: () => void;
 };
 
-function FeedbackMessage({ result, onDismiss }: FeedbackMessageProps) {
+function getErrorGuidance(result: SessionControlResult): string | null {
+  if (result.success || !result.message) return null;
+  
+  const message = result.message.toLowerCase();
+  
+  if (message.includes('permission') || message.includes('access')) {
+    return 'Check file permissions and ensure you have access to the session files.';
+  }
+  if (message.includes('not found') || message.includes('does not exist')) {
+    return 'The session may have been moved or deleted. Try refreshing the monitoring data.';
+  }
+  if (message.includes('network') || message.includes('connection')) {
+    return 'Network issue detected. Check your connection and try again.';
+  }
+  if (message.includes('timeout')) {
+    return 'Operation timed out. The session may be unresponsive. Consider force termination.';
+  }
+  if (message.includes('already')) {
+    return 'The session is already in the requested state. Refresh to see current status.';
+  }
+  if (message.includes('process')) {
+    return 'Could not find or control the session process. It may have already stopped.';
+  }
+  
+  return 'Check the session status and try again. Contact support if the issue persists.';
+}
+
+function isRetryableError(result: SessionControlResult): boolean {
+  if (result.success) return false;
+  
+  const message = result.message?.toLowerCase() || '';
+  
+  // Don't retry permission, validation, or already-completed errors
+  if (message.includes('permission') || 
+      message.includes('access') || 
+      message.includes('invalid') || 
+      message.includes('already') ||
+      message.includes('not found')) {
+    return false;
+  }
+  
+  // Retry network, timeout, or process errors
+  return message.includes('network') || 
+         message.includes('timeout') || 
+         message.includes('connection') || 
+         message.includes('process');
+}
+
+function FeedbackMessage({ result, onDismiss, onRetry }: FeedbackMessageProps) {
   if (!result) return null;
 
   const isSuccess = result.success;
   const bgColor = isSuccess ? "bg-emerald-600/20" : "bg-red-600/20";
   const textColor = isSuccess ? "text-emerald-300" : "text-red-300";
   const borderColor = isSuccess ? "border-emerald-600/30" : "border-red-600/30";
+  const guidance = getErrorGuidance(result);
+  const canRetry = onRetry && isRetryableError(result);
 
   return (
     <div className={`rounded-lg border p-3 ${bgColor} ${borderColor}`}>
@@ -170,10 +221,23 @@ function FeedbackMessage({ result, onDismiss }: FeedbackMessageProps) {
               {result.message}
             </p>
           )}
+          {guidance && (
+            <p className="text-xs text-slate-400 mt-2 italic">
+              💡 {guidance}
+            </p>
+          )}
+          {canRetry && (
+            <button
+              onClick={onRetry}
+              className="text-xs text-blue-400 hover:text-blue-300 mt-2 underline"
+            >
+              🔄 Try Again
+            </button>
+          )}
         </div>
         <button
           onClick={onDismiss}
-          className={`ml-2 ${textColor} hover:opacity-75`}
+          className={`ml-2 ${textColor} hover:opacity-75 flex-shrink-0`}
           aria-label="Dismiss message"
         >
           <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,6 +269,8 @@ export function SessionControlPanel({
   const [loadingAction, setLoadingAction] = useState<SessionControlAction | null>(null);
   const [confirmAction, setConfirmAction] = useState<SessionControlAction | null>(null);
   const [lastResult, setLastResult] = useState<SessionControlResult | null>(null);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  const [lastAction, setLastAction] = useState<SessionControlAction | null>(null);
 
   const handleActionClick = (action: SessionControlAction) => {
     // Show confirmation for destructive actions
@@ -222,31 +288,49 @@ export function SessionControlPanel({
     }
   };
 
-  const executeAction = async (action: SessionControlAction) => {
+  const executeAction = async (action: SessionControlAction, isRetry = false) => {
     setLoadingAction(action);
-    setLastResult(null);
+    setLastAction(action);
+    if (!isRetry) {
+      setLastResult(null);
+      setRetryAttempts(0);
+    } else {
+      setRetryAttempts(prev => prev + 1);
+    }
 
     try {
       const request: SessionControlRequest = {
         sessionId,
         projectId,
         action,
-        reason: `User initiated ${action} from control panel`,
+        reason: `User initiated ${action} from control panel${isRetry ? ` (retry ${retryAttempts + 1})` : ''}`,
         force: action === 'terminate' || action === 'restart'
       };
 
       const result = await onControlAction(request);
       setLastResult(result);
+      
+      // Reset retry attempts on success
+      if (result.success) {
+        setRetryAttempts(0);
+      }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setLastResult({
         sessionId,
         action,
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: `${errorMessage}${isRetry ? ` (attempt ${retryAttempts + 1})` : ''}`,
         timestamp: new Date().toISOString()
       });
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastAction && retryAttempts < 3) {
+      executeAction(lastAction, true);
     }
   };
 
@@ -285,7 +369,11 @@ export function SessionControlPanel({
         {lastResult && (
           <FeedbackMessage
             result={lastResult}
-            onDismiss={() => setLastResult(null)}
+            onDismiss={() => {
+              setLastResult(null);
+              setRetryAttempts(0);
+            }}
+            onRetry={retryAttempts < 3 ? handleRetry : undefined}
           />
         )}
         
@@ -302,8 +390,20 @@ export function SessionControlPanel({
           ))}
         </div>
 
-        <div className="text-xs text-slate-500">
-          Session State: <span className="text-slate-300 capitalize">{currentState}</span>
+        <div className="text-xs text-slate-500 space-y-1">
+          <div>
+            Session State: <span className="text-slate-300 capitalize">{currentState}</span>
+          </div>
+          {retryAttempts > 0 && (
+            <div className="text-amber-400">
+              Retry attempts: {retryAttempts}/3
+            </div>
+          )}
+          {availableActions.length === 0 && (
+            <div className="text-slate-400 italic">
+              💡 Some actions may become available when session state changes
+            </div>
+          )}
         </div>
       </div>
 
