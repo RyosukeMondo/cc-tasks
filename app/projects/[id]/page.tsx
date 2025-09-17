@@ -155,6 +155,7 @@ export default function ProjectDetailPage() {
         <main className="flex-1">
           <SessionList
             sessions={sessions}
+            projectId={projectId}
             projectName={project.name}
             onSessionSelect={handleSessionSelect}
             isLoading={false}

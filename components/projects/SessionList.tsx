@@ -6,6 +6,7 @@ import { SessionCard } from "./SessionCard";
 
 type SessionListProps = {
   sessions: SessionMetadata[];
+  projectId?: string;
   projectName?: string;
   onSessionSelect?: (sessionId: string) => void;
   isLoading?: boolean;
@@ -14,6 +15,7 @@ type SessionListProps = {
 
 export function SessionList({ 
   sessions, 
+  projectId,
   projectName,
   onSessionSelect, 
   isLoading = false, 
@@ -44,6 +46,7 @@ export function SessionList({
             <SessionCard
               key={session.id}
               session={session}
+              projectId={projectId}
               onClick={onSessionSelect ? () => onSessionSelect(session.id) : undefined}
             />
           ))}

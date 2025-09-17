@@ -6,7 +6,7 @@ export type ConversationEntry = {
   metadata?: EntryMetadata;
   toolName?: string;
   toolUseId?: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
   isError?: boolean;
 };
 
@@ -15,7 +15,7 @@ export type EntryMetadata = {
   duration?: number;
   tokenCount?: number;
   model?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type SessionStats = {

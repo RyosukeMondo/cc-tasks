@@ -1,9 +1,165 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
 import { ConversationEntry, SessionStats } from "@/lib/types/conversation";
 import { cardSurface } from "@/lib/ui/layout";
+
 import { EntryCard } from "./EntryCard";
+
+const AlertIcon = () => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 24 24"
+    className="h-5 w-5 text-rose-300"
+    stroke="currentColor"
+    fill="none"
+    strokeWidth={1.5}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M10.29 3.86 1.82 18a1.5 1.5 0 0 0 1.29 2.25h17.78A1.5 1.5 0 0 0 22.18 18L13.71 3.86a1.5 1.5 0 0 0-2.42 0Z"
+    />
+  </svg>
+);
+
+const LoadingState = () => (
+  <div className="space-y-4">
+    {Array.from({ length: 3 }).map((_, index) => (
+      <div key={`loading-${index}`} className={`${cardSurface} animate-pulse p-4`}>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="h-5 w-24 rounded bg-slate-800" />
+          <div className="h-4 w-16 rounded bg-slate-800" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-full rounded bg-slate-800" />
+          <div className="h-4 w-3/4 rounded bg-slate-800" />
+          <div className="h-4 w-1/2 rounded bg-slate-800" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const ErrorState = ({ message }: { message: string }) => (
+  <div className={`${cardSurface} p-6`}>
+    <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-6 text-sm text-rose-200">
+      <div className="mb-3 flex items-center gap-2 font-medium">
+        <AlertIcon />
+        <span>Failed to load conversation</span>
+      </div>
+      <p className="text-rose-100/80">{message}</p>
+    </div>
+  </div>
+);
+
+const EmptyState = () => (
+  <div className={`${cardSurface} p-6`}>
+    <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
+      <div className="space-y-2">
+        <p className="font-medium text-slate-200">No conversation entries found</p>
+        <p>This session does not contain any conversation data yet.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const formatTimestamp = (value?: string) => {
+  if (!value) {
+    return "--";
+  }
+
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+};
+
+const SessionHeader = ({
+  sessionStats,
+  projectName,
+  sessionId,
+  activeIndex,
+}: {
+  sessionStats?: SessionStats;
+  projectName?: string;
+  sessionId?: string;
+  activeIndex: number;
+}) => {
+  const totalEntries = sessionStats?.totalEntries ?? 0;
+  const viewingSummary = totalEntries > 0 ? `${Math.min(activeIndex + 1, totalEntries)} of ${totalEntries}` : "None";
+
+  return (
+    <div className={`${cardSurface} p-6`}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-white">Conversation Session</h1>
+          <div className="mt-1 space-y-1 text-sm text-slate-400">
+            {projectName && <p>Project: {projectName}</p>}
+            {sessionId && <p className="font-mono text-xs text-slate-500">Session ID: {sessionId}</p>}
+          </div>
+        </div>
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs uppercase tracking-wide text-blue-200">
+          Viewing {viewingSummary}
+        </div>
+      </div>
+
+      {sessionStats && totalEntries > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-slate-800/40 p-3 text-center">
+            <div className="text-lg font-semibold text-white">{sessionStats.totalEntries}</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400">Total entries</div>
+          </div>
+          <div className="rounded-lg bg-slate-800/40 p-3 text-center">
+            <div className="text-lg font-semibold text-blue-300">{sessionStats.userMessages}</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400">User messages</div>
+          </div>
+          <div className="rounded-lg bg-slate-800/40 p-3 text-center">
+            <div className="text-lg font-semibold text-purple-300">{sessionStats.assistantMessages}</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400">Assistant replies</div>
+          </div>
+          <div className="rounded-lg bg-slate-800/40 p-3 text-center">
+            <div className="text-lg font-semibold text-amber-300">{sessionStats.toolInvocations}</div>
+            <div className="text-xs uppercase tracking-wider text-slate-400">Tool invocations</div>
+          </div>
+        </div>
+      )}
+
+      {sessionStats && (
+        <div className="mt-4 grid gap-3 text-xs text-slate-400 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <span className="text-slate-500">First entry:</span> {formatTimestamp(sessionStats.firstTimestamp)}
+          </div>
+          <div>
+            <span className="text-slate-500">Last entry:</span> {formatTimestamp(sessionStats.lastTimestamp)}
+          </div>
+          {typeof sessionStats.totalTokens === "number" && (
+            <div>
+              <span className="text-slate-500">Total tokens:</span> {sessionStats.totalTokens}
+            </div>
+          )}
+          {typeof sessionStats.duration === "number" && (
+            <div>
+              <span className="text-slate-500">Duration:</span> {(sessionStats.duration / 1000).toFixed(1)}s
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 type ConversationViewerProps = {
   entries: ConversationEntry[];
@@ -13,279 +169,267 @@ type ConversationViewerProps = {
   projectName?: string;
   sessionId?: string;
   onEntryClick?: (entry: ConversationEntry, index: number) => void;
-  showFullContent?: boolean;
+
+  onVisibleIndexChange?: (index: number) => void;
 };
 
-function LoadingState() {
-  return (
-    <div className="space-y-4">
-      {[...Array(3)].map((_, i) => (
-        <div
-          key={i}
-          className={`${cardSurface} p-4 animate-pulse`}
-        >
-          <div className="flex items-start justify-between mb-3">
-            <div className="h-6 w-20 bg-slate-700 rounded-full"></div>
-            <div className="h-4 w-16 bg-slate-700 rounded"></div>
-          </div>
-          <div className="space-y-2">
-            <div className="h-4 w-full bg-slate-700 rounded"></div>
-            <div className="h-4 w-3/4 bg-slate-700 rounded"></div>
-            <div className="h-4 w-1/2 bg-slate-700 rounded"></div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+export type ConversationViewerHandle = {
+  scrollToIndex: (index: number) => void;
+  scrollToTop: () => void;
+  scrollToBottom: () => void;
+};
+
+function getProgressText(activeIndex: number, total: number) {
+  if (total === 0) {
+    return "No entries";
+  }
+
+  return `Entry ${Math.min(activeIndex + 1, total)} of ${total}`;
 }
 
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className={`${cardSurface} p-6`}>
-      <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-6 text-sm text-rose-200">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">⚠️</span>
-          <span className="font-medium">Failed to load conversation</span>
-        </div>
-        <p>{message}</p>
-      </div>
-    </div>
-  );
-}
+export const ConversationViewer = forwardRef<ConversationViewerHandle, ConversationViewerProps>(
+  function ConversationViewer(
+    {
+      entries,
+      sessionStats,
+      isLoading = false,
+      errorMessage = null,
+      projectName,
+      sessionId,
+      onEntryClick,
 
-function EmptyState() {
-  return (
-    <div className={`${cardSurface} p-6`}>
-      <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
-        <div className="space-y-2">
-          <p className="font-medium">No conversation entries found</p>
-          <p>This session doesn't contain any conversation data yet.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+      onVisibleIndexChange,
+    },
+    ref,
+  ) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const entryRefs = useRef<Array<HTMLDivElement | null>>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const activeIndexRef = useRef(0);
 
-function SessionHeader({ sessionStats, projectName, sessionId }: {
-  sessionStats?: SessionStats;
-  projectName?: string;
-  sessionId?: string;
-}) {
-  return (
-    <div className={`${cardSurface} p-6 mb-6`}>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-semibold text-white">
-            Conversation Session
-          </h1>
-          {projectName && (
-            <p className="text-sm text-slate-400 mt-1">
-              Project: {projectName}
-            </p>
-          )}
-          {sessionId && (
-            <p className="text-xs text-slate-500 mt-1 font-mono">
-              Session ID: {sessionId}
-            </p>
-          )}
-        </div>
-      </div>
+    const totalEntries = entries.length;
 
-      {sessionStats && sessionStats.totalEntries > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-lg font-semibold text-white">
-              {sessionStats.totalEntries}
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wide">
-              Total Entries
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-blue-300">
-              {sessionStats.userMessages}
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wide">
-              User Messages
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-purple-300">
-              {sessionStats.assistantMessages}
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wide">
-              Assistant Messages
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-amber-300">
-              {sessionStats.toolInvocations}
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wide">
-              Tool Invocations
-            </div>
-          </div>
-        </div>
-      )}
+    useEffect(() => {
+      entryRefs.current = new Array(totalEntries).fill(null);
+      if (totalEntries === 0) {
+        activeIndexRef.current = 0;
+        setActiveIndex(0);
+      } else if (activeIndexRef.current >= totalEntries) {
+        activeIndexRef.current = totalEntries - 1;
+        setActiveIndex(totalEntries - 1);
+      }
+    }, [totalEntries]);
 
-      {sessionStats && (sessionStats.totalTokens || sessionStats.duration) && (
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <div className="flex items-center gap-6 text-xs text-slate-400">
-            {sessionStats.totalTokens && (
-              <span>{sessionStats.totalTokens.toLocaleString()} tokens</span>
-            )}
-            {sessionStats.duration && (
-              <span>{(sessionStats.duration / 1000).toFixed(2)}s duration</span>
-            )}
-            {sessionStats.firstTimestamp && (
-              <span>
-                Started: {new Date(sessionStats.firstTimestamp).toLocaleString()}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+    useEffect(() => {
+      if (typeof onVisibleIndexChange === "function") {
+        onVisibleIndexChange(totalEntries === 0 ? 0 : activeIndex);
+      }
+    }, [activeIndex, onVisibleIndexChange, totalEntries]);
+    const updateActiveIndex = useCallback(
+      (nextIndex: number) => {
+        if (nextIndex < 0 || nextIndex >= totalEntries) {
+          return;
+        }
 
-function VirtualizedEntries({ 
-  entries, 
-  onEntryClick, 
-  showFullContent 
-}: {
-  entries: ConversationEntry[];
-  onEntryClick?: (entry: ConversationEntry, index: number) => void;
-  showFullContent?: boolean;
-}) {
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: Math.min(50, entries.length) });
-  
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const scrollTop = container.scrollTop;
-    const containerHeight = container.clientHeight;
-    const scrollHeight = container.scrollHeight;
-    
-    // Calculate visible range based on scroll position
-    const itemHeight = 200; // Approximate height per entry
-    const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - 5);
-    const endIndex = Math.min(
-      entries.length,
-      Math.ceil((scrollTop + containerHeight) / itemHeight) + 10
+        if (activeIndexRef.current === nextIndex) {
+          return;
+        }
+
+        activeIndexRef.current = nextIndex;
+        setActiveIndex(nextIndex);
+
+      },
+      [totalEntries],
     );
-    
-    // Load more entries when approaching the end
-    if (scrollTop + containerHeight >= scrollHeight * 0.9) {
-      setVisibleRange(prev => ({
-        start: prev.start,
-        end: Math.min(entries.length, prev.end + 25)
-      }));
-    }
-    
-    setVisibleRange({ start: startIndex, end: endIndex });
-  }, [entries.length]);
 
-  const visibleEntries = useMemo(() => {
-    return entries.slice(visibleRange.start, visibleRange.end);
-  }, [entries, visibleRange]);
+    const intersectionCallback = useCallback<IntersectionObserverCallback>(
+      (observerEntries) => {
+        let bestIndex: number | null = null;
+        let bestRatio = 0;
 
-  return (
-    <div 
-      className="space-y-4 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-slate-600"
-      onScroll={handleScroll}
-      role="log"
-      aria-label="Conversation entries"
-    >
-      {/* Spacer for virtual scrolling */}
-      {visibleRange.start > 0 && (
-        <div style={{ height: visibleRange.start * 200 }} />
-      )}
-      
-      {visibleEntries.map((entry, localIndex) => {
-        const globalIndex = visibleRange.start + localIndex;
-        return (
-          <EntryCard
-            key={entry.id || `entry-${globalIndex}`}
-            entry={entry}
-            onClick={onEntryClick ? () => onEntryClick(entry, globalIndex) : undefined}
-            showFullContent={showFullContent}
+        for (const observerEntry of observerEntries) {
+          if (observerEntry.intersectionRatio <= 0) {
+            continue;
+          }
+
+          const indexAttr = observerEntry.target.getAttribute("data-entry-index");
+          if (!indexAttr) {
+            continue;
+          }
+
+          const index = Number.parseInt(indexAttr, 10);
+          if (Number.isNaN(index)) {
+            continue;
+          }
+
+          if (observerEntry.intersectionRatio > bestRatio) {
+            bestRatio = observerEntry.intersectionRatio;
+            bestIndex = index;
+          }
+        }
+
+        if (bestIndex !== null && bestRatio > 0) {
+          updateActiveIndex(bestIndex);
+        }
+      },
+      [updateActiveIndex],
+    );
+
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container || totalEntries === 0) {
+        return;
+      }
+
+      const observer = new IntersectionObserver(intersectionCallback, {
+        root: container,
+        threshold: [0.2, 0.4, 0.6, 0.8],
+      });
+
+      entryRefs.current.forEach((node) => {
+        if (node) {
+          observer.observe(node);
+        }
+      });
+
+      return () => observer.disconnect();
+    }, [intersectionCallback, totalEntries]);
+
+    const setEntryRef = useCallback(
+      (index: number) => (node: HTMLDivElement | null) => {
+        entryRefs.current[index] = node;
+      },
+      [],
+    );
+
+    const scrollToTop = useCallback(() => {
+      containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+
+    const scrollToBottom = useCallback(() => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }, []);
+
+    const scrollToIndex = useCallback(
+      (index: number) => {
+        const container = containerRef.current;
+        const target = entryRefs.current[index];
+        if (!container || !target) {
+          return;
+        }
+
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const offset = targetRect.top - containerRect.top + container.scrollTop - 16;
+
+        container.scrollTo({ top: Math.max(offset, 0), behavior: "smooth" });
+      },
+      [],
+    );
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        scrollToIndex,
+        scrollToTop,
+        scrollToBottom,
+      }),
+      [scrollToBottom, scrollToIndex, scrollToTop],
+    );
+
+    const progressText = useMemo(
+      () => getProgressText(activeIndex, totalEntries),
+      [activeIndex, totalEntries],
+    );
+
+    if (isLoading) {
+      return (
+        <div className="space-y-6">
+          <SessionHeader
+            sessionStats={sessionStats}
+            projectName={projectName}
+            sessionId={sessionId}
+            activeIndex={0}
           />
-        );
-      })}
-      
-      {/* Spacer for remaining entries */}
-      {visibleRange.end < entries.length && (
-        <div style={{ height: (entries.length - visibleRange.end) * 200 }} />
-      )}
-      
-      {/* Progress indicator */}
-      {entries.length > 50 && (
-        <div className="sticky bottom-0 bg-slate-900/90 backdrop-blur p-2 text-center text-xs text-slate-400">
-          Showing {visibleRange.start + 1}-{Math.min(visibleRange.end, entries.length)} of {entries.length} entries
+          <LoadingState />
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }
 
-export function ConversationViewer({
-  entries,
-  sessionStats,
-  isLoading = false,
-  errorMessage = null,
-  projectName,
-  sessionId,
-  onEntryClick,
-  showFullContent = false,
-}: ConversationViewerProps) {
-  // Handle loading state
-  if (isLoading) {
-    return (
-      <div>
-        <SessionHeader projectName={projectName} sessionId={sessionId} />
-        <LoadingState />
-      </div>
-    );
-  }
+    if (errorMessage) {
+      return (
+        <div className="space-y-6">
+          <SessionHeader
+            sessionStats={sessionStats}
+            projectName={projectName}
+            sessionId={sessionId}
+            activeIndex={0}
+          />
+          <ErrorState message={errorMessage} />
+        </div>
+      );
+    }
 
-  // Handle error state
-  if (errorMessage) {
-    return (
-      <div>
-        <SessionHeader projectName={projectName} sessionId={sessionId} />
-        <ErrorState message={errorMessage} />
-      </div>
-    );
-  }
+    if (!entries.length) {
+      return (
+        <div className="space-y-6">
+          <SessionHeader
+            sessionStats={sessionStats}
+            projectName={projectName}
+            sessionId={sessionId}
+            activeIndex={0}
+          />
+          <EmptyState />
+        </div>
+      );
+    }
 
-  // Handle empty state
-  if (!entries.length) {
     return (
-      <div>
-        <SessionHeader 
-          sessionStats={sessionStats} 
-          projectName={projectName} 
-          sessionId={sessionId} 
+      <div className="space-y-6">
+        <SessionHeader
+          sessionStats={sessionStats}
+          projectName={projectName}
+          sessionId={sessionId}
+          activeIndex={activeIndex}
         />
-        <EmptyState />
+
+        <div className={`${cardSurface} p-4`} aria-live="polite">
+          <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+            <span>{progressText}</span>
+            <button
+              type="button"
+              onClick={scrollToTop}
+              className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              Back to top
+            </button>
+          </div>
+
+          <div
+            ref={containerRef}
+            className="max-h-[70vh] space-y-4 overflow-y-auto pr-2 scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700"
+            aria-label="Conversation entries"
+            role="log"
+          >
+            {entries.map((entry, index) => (
+              <EntryCard
+                key={entry.id ?? `entry-${index}`}
+                ref={setEntryRef(index)}
+                entry={entry}
+                data-entry-index={index}
+                onClick={onEntryClick ? () => onEntryClick(entry, index) : undefined}
+                className={`transition-all duration-150 ${
+                  index === activeIndex ? "ring-1 ring-blue-500/40" : "ring-1 ring-transparent"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
-  }
-
-  // Main conversation view
-  return (
-    <div className="space-y-6">
-      <SessionHeader 
-        sessionStats={sessionStats} 
-        projectName={projectName} 
-        sessionId={sessionId} 
-      />
-      
-      <VirtualizedEntries
-        entries={entries}
-        onEntryClick={onEntryClick}
-        showFullContent={showFullContent}
-      />
-    </div>
-  );
-}
+  },
+);
