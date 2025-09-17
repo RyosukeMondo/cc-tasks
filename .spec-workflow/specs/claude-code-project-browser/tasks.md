@@ -45,7 +45,7 @@
   - _Requirements: Requirement 1, Requirement 4_
   - _Prompt: Implement the task for spec claude-code-project-browser, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Developer with expertise in React list rendering and state management | Task: Create ProjectList component following Requirements 1 and 4, rendering ProjectCard components with proper loading/error/empty states | Restrictions: Must handle loading states gracefully, provide clear empty state messaging, maintain performance with large project lists | _Leverage: Use ProjectCard component, follow existing loading and error handling patterns from the codebase | _Requirements: Requirement 1 (project listing), Requirement 4 (responsive interface) | Success: Component renders project lists efficiently, handles all states properly, user-friendly empty states | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 6. Create SessionCard component in components/projects/SessionCard.tsx
+- [x] 6. Create SessionCard component in components/projects/SessionCard.tsx
   - File: components/projects/SessionCard.tsx
   - Display session file metadata (name, size, date) in card format
   - Handle file access errors and missing metadata gracefully
