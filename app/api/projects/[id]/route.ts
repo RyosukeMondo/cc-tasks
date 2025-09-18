@@ -10,7 +10,7 @@ interface RouteContext {
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const projectId = context.params?.id;
+  const { id: projectId } = await context.params;
 
   if (!projectId) {
     return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
