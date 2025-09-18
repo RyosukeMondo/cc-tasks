@@ -5,7 +5,6 @@ import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 
 import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
-import { projectService } from "@/lib/services/projectService";
 import { Project } from "@/lib/types/project";
 
 interface ProjectLayoutProps {
@@ -33,16 +32,19 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
         setIsLoading(true);
         setError(null);
 
-        const projectList = await projectService.listProjects();
-        const foundProject = projectList.find((item) => item.id === projectId);
-        
-        if (!foundProject) {
-          setError(`Project "${projectId}" not found`);
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError(`Project "${projectId}" not found`);
+          } else {
+            setError(`Failed to load project: ${response.statusText}`);
+          }
           setIsLoading(false);
           return;
         }
 
-        setProject(foundProject);
+        const data = await response.json();
+        setProject(data.project);
       } catch (err) {
         console.error("Failed to load project:", err);
         setError(err instanceof Error ? err.message : "Failed to load project");

@@ -6,10 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import { ConversationNavigation } from "@/components/conversations/ConversationNavigation";
 import { ConversationViewer, type ConversationViewerHandle } from "@/components/conversations/ConversationViewer";
 import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
-import { conversationService } from "@/lib/services/conversationService";
-import { projectService } from "@/lib/services/projectService";
 import { ConversationEntry, SessionStats } from "@/lib/types/conversation";
 import { Project } from "@/lib/types/project";
+
+interface SessionResponse {
+  project?: Project;
+  entries?: ConversationEntry[];
+  stats?: SessionStats;
+  error?: string;
+}
 
 export default function SessionContentPage() {
   const params = useParams();
@@ -28,44 +33,67 @@ export default function SessionContentPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!projectId || !sessionId) {
+      setError("Invalid project ID or session ID");
+      setIsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const controller = new AbortController();
+
     const loadSessionContent = async () => {
-      if (!projectId || !sessionId) {
-        setError("Invalid project ID or session ID");
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        setIsLoading(true);
-        setError(null);
+        if (!isCancelled) {
+          setIsLoading(true);
+          setError(null);
+        }
 
-        const [projectList, conversationEntries] = await Promise.all([
-          projectService.listProjects(),
-          conversationService.parseConversationFile(projectId, sessionId),
-        ]);
+        const response = await fetch(
+          `/api/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
+          { signal: controller.signal },
+        );
 
-        const foundProject = projectList.find((item) => item.id === projectId);
-        if (!foundProject) {
-          setError(`Project "${projectId}" not found`);
-          setIsLoading(false);
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as SessionResponse;
+          throw new Error(payload.error ?? "Failed to load session content");
+        }
+
+        const data = (await response.json()) as SessionResponse;
+        if (!data.project) {
+          throw new Error("Project not found");
+        }
+
+        if (!isCancelled) {
+          setProject(data.project);
+          setEntries(data.entries ?? []);
+          setSessionStats(data.stats ?? undefined);
+          setActiveEntryIndex(0);
+        }
+      } catch (err) {
+        const errorObj = err as Error;
+        if (isCancelled || errorObj.name === "AbortError") {
           return;
         }
 
-        setProject(foundProject);
-        setEntries(conversationEntries);
-
-        const stats = conversationService.getSessionStats(conversationEntries);
-        setSessionStats(stats);
-        setActiveEntryIndex(0);
-      } catch (err) {
         console.error("Failed to load session content:", err);
-        setError(err instanceof Error ? err.message : "Failed to load session content");
+        setError(errorObj.message ?? "Failed to load session content");
+        setProject(null);
+        setEntries([]);
+        setSessionStats(undefined);
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void loadSessionContent();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
   }, [projectId, sessionId]);
 
   const handleBackToProject = useCallback(() => {
@@ -160,7 +188,6 @@ export default function SessionContentPage() {
                 projectName={project.name}
                 sessionId={sessionId}
                 onEntryClick={handleEntryClick}
-
                 onVisibleIndexChange={handleVisibleIndexChange}
               />
             </section>

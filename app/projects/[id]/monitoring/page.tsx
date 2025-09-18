@@ -8,7 +8,6 @@ import { SessionStatusIndicator } from "@/components/monitoring/SessionStatusInd
 import { SessionProgressDisplay } from "@/components/monitoring/SessionProgressDisplay";
 import { SessionControlPanel } from "@/components/monitoring/SessionControlPanel";
 import { useSessionMonitoring } from "@/hooks/useSessionMonitoring";
-import { projectService } from "@/lib/services/projectService";
 import { Project } from "@/lib/types/project";
 import { MonitoringUpdate } from "@/lib/types/monitoring";
 import { cardSurface } from "@/lib/ui/layout";
@@ -206,16 +205,19 @@ export default function MonitoringDashboardPage() {
         setIsLoadingProject(true);
         setProjectError(null);
 
-        const projectList = await projectService.listProjects();
-        const foundProject = projectList.find((item) => item.id === projectId);
-
-        if (!foundProject) {
-          setProjectError(`Project "${projectId}" not found`);
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setProjectError(`Project "${projectId}" not found`);
+          } else {
+            setProjectError(`Failed to load project: ${response.statusText}`);
+          }
           setIsLoadingProject(false);
           return;
         }
 
-        setProject(foundProject);
+        const data = await response.json();
+        setProject(data.project);
       } catch (err) {
         console.error("Failed to load project:", err);
         setProjectError(err instanceof Error ? err.message : "Failed to load project");

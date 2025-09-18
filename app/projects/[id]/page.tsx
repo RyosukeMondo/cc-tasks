@@ -1,15 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { SessionList } from "@/components/projects/SessionList";
-import { sessionService } from "@/lib/services/sessionService";
-import { projectService } from "@/lib/services/projectService";
 import { SessionMetadata, Project } from "@/lib/types/project";
+
+interface ProjectResponse {
+  project?: Project;
+  sessions?: SessionMetadata[];
+  error?: string;
+}
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -18,48 +23,74 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!projectId) {
+      setError("Invalid project ID");
+      setIsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const controller = new AbortController();
+
     const loadProjectAndSessions = async () => {
-      if (!projectId) {
-        setError("Invalid project ID");
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        setIsLoading(true);
-        setError(null);
+        if (!isCancelled) {
+          setIsLoading(true);
+          setError(null);
+        }
 
-        // Load project metadata and sessions in parallel
-        const [projectList, sessionList] = await Promise.all([
-          projectService.listProjects(),
-          sessionService.listSessionsForProject(projectId),
-        ]);
+        const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+          signal: controller.signal,
+        });
 
-        const foundProject = projectList.find((item) => item.id === projectId);
-        if (!foundProject) {
-          setError(`Project "${projectId}" not found`);
-          setIsLoading(false);
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as ProjectResponse;
+          throw new Error(payload.error ?? "Failed to load project details");
+        }
+
+        const data = (await response.json()) as ProjectResponse;
+        if (!data.project) {
+          throw new Error("Project not found");
+        }
+
+        if (!isCancelled) {
+          setProject(data.project);
+          setSessions(data.sessions ?? []);
+        }
+      } catch (err) {
+        const errorObj = err as Error;
+        if (isCancelled || errorObj.name === "AbortError") {
           return;
         }
 
-        setProject(foundProject);
-        setSessions(sessionList);
-      } catch (err) {
         console.error("Failed to load project details:", err);
-        setError(err instanceof Error ? err.message : "Failed to load project details");
+        setError(errorObj.message ?? "Failed to load project details");
+        setProject(null);
+        setSessions([]);
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void loadProjectAndSessions();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
   }, [projectId]);
 
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
-      console.log(`Selected session: ${sessionId} in project: ${projectId}`);
+      if (!projectId) {
+        return;
+      }
+
+      router.push(`/projects/${projectId}/sessions/${sessionId}`);
     },
-    [projectId],
+    [projectId, router],
   );
 
   const projectDescription = useMemo(() => {
@@ -147,5 +178,3 @@ export default function ProjectDetailPage() {
     </>
   );
 }
-
-

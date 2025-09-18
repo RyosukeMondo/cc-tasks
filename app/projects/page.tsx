@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 
 import { ProjectList } from "@/components/projects/ProjectList";
 import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
-import { projectService } from "@/lib/services/projectService";
 import { Project } from "@/lib/types/project";
+
+type ProjectsResponse = {
+  projects?: Project[];
+  error?: string;
+};
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -15,21 +19,48 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+    const controller = new AbortController();
+
     const loadProjects = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
-        const projectList = await projectService.listProjects();
-        setProjects(projectList);
+        if (!isCancelled) {
+          setIsLoading(true);
+          setError(null);
+        }
+
+        const response = await fetch("/api/projects", { signal: controller.signal });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as ProjectsResponse;
+          throw new Error(payload.error ?? "Failed to load projects");
+        }
+
+        const data = (await response.json()) as ProjectsResponse;
+        if (!isCancelled) {
+          setProjects(data.projects ?? []);
+        }
       } catch (err) {
+        const errorObj = err as Error;
+        if (isCancelled || errorObj.name === "AbortError") {
+          return;
+        }
+
         console.error("Failed to load projects:", err);
-        setError(err instanceof Error ? err.message : "Failed to load projects");
+        setError(errorObj.message ?? "Failed to load projects");
+        setProjects([]);
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void loadProjects();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
   }, []);
 
   const handleProjectSelect = useCallback(
