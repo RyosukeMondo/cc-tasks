@@ -108,7 +108,7 @@
   - _Requirements: Requirement 5, all security requirements_
   - _Prompt: Implement the task for spec claude-code-session-viewer, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Security-focused Developer with expertise in content sanitization and XSS prevention | Task: Create content sanitization utilities following Requirement 5 and security requirements, implementing safe content processing for conversation display | Restrictions: Must prevent XSS attacks, preserve legitimate formatting, handle edge cases safely | _Leverage: Use Node.js built-in security utilities and safe content processing patterns | _Requirements: Requirement 5 (content formatting), all security requirements | Success: Utilities prevent security issues, preserve content formatting, handle all content types safely | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [-] 13. Integration testing and performance optimization
+- [x] 13. Integration testing and performance optimization
   - Files: All conversation components and services
   - End-to-end testing of session content viewing flow
   - Performance validation for large JSONL files and long conversations
