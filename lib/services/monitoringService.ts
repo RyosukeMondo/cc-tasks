@@ -10,13 +10,13 @@ import {
 import { sessionStateDetector } from './sessionStateDetector';
 import { sessionController } from './sessionController';
 
-// Default configuration for monitoring
+// Default configuration for monitoring - Optimized for performance
 const DEFAULT_CONFIG: MonitoringConfig = {
-  pollInterval: 2000,        // 2 seconds
-  healthCheckInterval: 10000, // 10 seconds
+  pollInterval: 800,         // 800ms - optimized for sub-1s updates
+  healthCheckInterval: 5000, // 5 seconds - more frequent health checks
   staleThreshold: 300000,    // 5 minutes
   maxSessions: 50,
-  enableAutoRecovery: false,
+  enableAutoRecovery: true,  // Enable auto-recovery for better reliability
   enableNotifications: false
 };
 

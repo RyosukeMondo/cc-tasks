@@ -117,7 +117,7 @@
   - _Requirements: Requirement 3, Requirement 4_
   - _Prompt: Implement the task for spec real-time-session-monitoring, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Reliability Engineer with expertise in error handling and system resilience | Task: Implement comprehensive error handling following Requirements 3 and 4, adding retry logic and graceful degradation across all monitoring components and services | Restrictions: Must not mask critical errors, provide meaningful error messages to users, maintain system stability during failures | _Leverage: Review all monitoring services and components to add consistent error handling and recovery mechanisms | _Requirements: Requirement 3 (session health monitoring), Requirement 4 (reliable updates) | Success: System handles errors gracefully, users receive helpful feedback, monitoring continues functioning during partial failures | Instructions: Set this task to in-progress in tasks.md before starting, mark as complete when done_
 
-- [ ] 14. Integration testing and performance optimization for monitoring system
+- [-] 14. Integration testing and performance optimization for monitoring system
   - Files: All monitoring components, services, and API endpoints
   - End-to-end testing of real-time monitoring flow with multiple concurrent sessions
   - Performance validation for polling efficiency and memory usage

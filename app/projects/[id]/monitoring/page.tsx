@@ -194,11 +194,11 @@ export default function MonitoringDashboardPage() {
                 <span className="text-white">{sessions.length}</span>
               </div>
             )}
-            {monitoringData?.lastUpdate && (
+            {monitoringData?.lastUpdated && (
               <div className="flex items-center gap-2">
                 <span className="font-medium">Last Update:</span>
                 <span className="font-mono text-slate-300">
-                  {new Date(monitoringData.lastUpdate).toLocaleTimeString()}
+                  {new Date(monitoringData.lastUpdated).toLocaleTimeString()}
                 </span>
               </div>
             )}
