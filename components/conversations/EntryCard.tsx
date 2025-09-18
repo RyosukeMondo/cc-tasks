@@ -14,7 +14,7 @@ type EntryCardProps = HTMLAttributes<HTMLDivElement> & {
   onClick?: () => void;
 };
 
-type EntryComponent = (props: { entry: ConversationEntry; className?: string }) => JSX.Element | null;
+type EntryComponent = (props: { entry: ConversationEntry; className?: string }) => React.JSX.Element | null;
 
 const ENTRY_COMPONENTS: Record<ConversationEntry["type"], EntryComponent> = {
   user: UserMessage,

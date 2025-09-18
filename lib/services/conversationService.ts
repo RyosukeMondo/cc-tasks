@@ -43,6 +43,25 @@ async function isFileAccessible(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Finds the first accessible JSONL file for the given session within supported directories.
+ */
+async function findSessionFilePath(validatedPath: string, sessionFileName: string): Promise<string | null> {
+  const candidateDirs = [
+    path.join(validatedPath, 'conversations'),
+    validatedPath,
+  ];
+
+  for (const dir of candidateDirs) {
+    const candidate = path.join(dir, sessionFileName);
+    if (await isFileAccessible(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Validates file size to prevent memory issues
  */
 async function validateFileSize(filePath: string): Promise<void> {
@@ -72,41 +91,149 @@ function parseJsonlLine(line: string, lineNumber: number): unknown | null {
 }
 
 /**
+ * Sanitizes content to prevent XSS while preserving formatting
+ */
+function sanitizeContent(content: string): string {
+  if (typeof content !== 'string') {
+    return '';
+  }
+
+  // Basic XSS prevention - remove dangerous HTML tags and scripts
+  // Note: This is a simple implementation. For production, consider using a library like DOMPurify
+  return content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '');
+}
+
+/**
+ * Validates and normalizes conversation entry data (internal function)
+ */
+function validateConversationEntryInternal(entry: unknown): ConversationEntry | null {
+  try {
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
+
+    const rawEntry = entry as Record<string, unknown>;
+    const type = rawEntry.type;
+
+    const validTypes = ["user", "assistant", "tool_use", "tool_result"] as const;
+    if (typeof type !== "string" || !validTypes.includes(type as (typeof validTypes)[number])) {
+      return null;
+    }
+
+    // Handle Claude Code JSONL format where content is nested in message.content
+    let content: string;
+    if (rawEntry.message && typeof rawEntry.message === "object") {
+      const message = rawEntry.message as Record<string, unknown>;
+      if (typeof message.content === "string") {
+        content = message.content;
+      } else if (Array.isArray(message.content)) {
+        // Handle assistant messages where content is an array of objects
+        const contentArray = message.content as Array<unknown>;
+        const textContent = contentArray
+          .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+          .filter((item) => item.type === "text" && typeof item.text === "string")
+          .map((item) => item.text as string)
+          .join("\n");
+        content = textContent || "";
+      } else {
+        return null;
+      }
+    } else if (typeof rawEntry.content === "string") {
+      content = rawEntry.content;
+    } else {
+      return null;
+    }
+
+    const sanitizedContent = sanitizeContent(content);
+
+    const validatedEntry: ConversationEntry = {
+      type: type as "user" | "assistant" | "tool_use" | "tool_result",
+      content: sanitizedContent,
+      timestamp:
+        typeof rawEntry.timestamp === "string" ? rawEntry.timestamp : new Date().toISOString(),
+    };
+
+    // Handle both id and uuid fields
+    if (typeof rawEntry.id === "string") {
+      validatedEntry.id = rawEntry.id;
+    } else if (typeof rawEntry.uuid === "string") {
+      validatedEntry.id = rawEntry.uuid;
+    }
+
+    if (rawEntry.metadata && typeof rawEntry.metadata === "object") {
+      validatedEntry.metadata = rawEntry.metadata as ConversationEntry["metadata"];
+    }
+
+    if (typeof rawEntry.toolName === "string") {
+      validatedEntry.toolName = rawEntry.toolName;
+    }
+
+    if (typeof rawEntry.toolUseId === "string") {
+      validatedEntry.toolUseId = rawEntry.toolUseId;
+    }
+
+    if (rawEntry.parameters && typeof rawEntry.parameters === "object") {
+      validatedEntry.parameters = rawEntry.parameters as ConversationEntry["parameters"];
+    }
+
+    if (typeof rawEntry.isError === "boolean") {
+      validatedEntry.isError = rawEntry.isError;
+    }
+
+    return validatedEntry;
+  } catch (error) {
+    console.warn("Failed to validate conversation entry:", error);
+    return null;
+  }
+}
+
+/**
  * Extracts conversation entries from JSONL content
  */
 function extractConversationEntries(content: string): ConversationEntry[] {
   const lines = content.split('\n');
   const entries: ConversationEntry[] = [];
-  
+
   let processedLines = 0;
-  
+  let validatedCount = 0;
+  let parsedCount = 0;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
+
     // Skip empty lines
     if (!line) {
       continue;
     }
-    
+
     // Prevent processing too many lines to avoid memory issues
     if (processedLines >= MAX_LINES) {
       console.warn(`Reached maximum line limit of ${MAX_LINES}, stopping processing`);
       break;
     }
-    
+
     const parsed = parseJsonlLine(line, i + 1);
     if (parsed === null) {
       continue;
     }
-    
-    const validated = conversationService.validateConversationEntry(parsed);
+    parsedCount++;
+
+    const validated = validateConversationEntryInternal(parsed);
     if (validated) {
       entries.push(validated);
+      validatedCount++;
     }
-    
+
     processedLines++;
   }
-  
+
+  // console.log(`JSONL parsing stats: ${processedLines} lines processed, ${parsedCount} parsed, ${validatedCount} validated`);
   return entries;
 }
 
@@ -115,81 +242,14 @@ export const conversationService: ConversationService = {
    * Validates and normalizes conversation entry data
    */
   validateConversationEntry(entry: unknown): ConversationEntry | null {
-    try {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-
-      const rawEntry = entry as Record<string, unknown>;
-      const type = rawEntry.type;
-      const content = rawEntry.content;
-
-      const validTypes = ["user", "assistant", "tool_use", "tool_result"] as const;
-      if (typeof type !== "string" || !validTypes.includes(type as (typeof validTypes)[number])) {
-        return null;
-      }
-
-      if (typeof content !== "string") {
-        return null;
-      }
-
-      const sanitizedContent = this.sanitizeContent(content);
-
-      const validatedEntry: ConversationEntry = {
-        type,
-        content: sanitizedContent,
-        timestamp:
-          typeof rawEntry.timestamp === "string" ? rawEntry.timestamp : new Date().toISOString(),
-      };
-
-      if (typeof rawEntry.id === "string") {
-        validatedEntry.id = rawEntry.id;
-      }
-
-      if (rawEntry.metadata && typeof rawEntry.metadata === "object") {
-        validatedEntry.metadata = rawEntry.metadata as ConversationEntry["metadata"];
-      }
-
-      if (typeof rawEntry.toolName === "string") {
-        validatedEntry.toolName = rawEntry.toolName;
-      }
-
-      if (typeof rawEntry.toolUseId === "string") {
-        validatedEntry.toolUseId = rawEntry.toolUseId;
-      }
-
-      if (rawEntry.parameters && typeof rawEntry.parameters === "object") {
-        validatedEntry.parameters = rawEntry.parameters as ConversationEntry["parameters"];
-      }
-
-      if (typeof rawEntry.isError === "boolean") {
-        validatedEntry.isError = rawEntry.isError;
-      }
-
-      return validatedEntry;
-    } catch (error) {
-      console.warn("Failed to validate conversation entry:", error);
-      return null;
-    }
+    return validateConversationEntryInternal(entry);
   },
 
   /**
    * Sanitizes content to prevent XSS while preserving formatting
    */
   sanitizeContent(content: string): string {
-    if (typeof content !== 'string') {
-      return '';
-    }
-    
-    // Basic XSS prevention - remove dangerous HTML tags and scripts
-    // Note: This is a simple implementation. For production, consider using a library like DOMPurify
-    return content
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-      .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '');
+    return sanitizeContent(content);
   },
 
   /**
@@ -199,27 +259,27 @@ export const conversationService: ConversationService = {
     try {
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
       const validatedPath = validateProjectPath(projectPath);
-      const sessionFilePath = path.join(validatedPath, 'conversations', `${sessionId}.jsonl`);
-      
-      // Validate file accessibility
-      if (!(await isFileAccessible(sessionFilePath))) {
+      const sessionFileName = `${sessionId}.jsonl`;
+      const sessionFilePath = await findSessionFilePath(validatedPath, sessionFileName);
+
+      if (!sessionFilePath) {
         throw new Error(`Session file not found or inaccessible: ${sessionId}`);
       }
-      
+
       // Validate file size before reading
       await validateFileSize(sessionFilePath);
-      
+
       // Read and parse file content
       const content = await fs.readFile(sessionFilePath, 'utf-8');
-      
+
       if (!content.trim()) {
         return [];
       }
-      
+
       const entries = extractConversationEntries(content);
-      
+
       // Sort entries by timestamp for proper chronological order
-      return entries.sort((a, b) => 
+      return entries.sort((a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
     } catch (error) {

@@ -86,7 +86,25 @@ export type MonitoringConfig = {
   enableNotifications: boolean;
 };
 
-// Real-time monitoring service data
+// Actual API response structure from the backend
+export type ApiMonitoringResponse = {
+  projectId: string;
+  monitoring: {
+    sessionCount: number;
+    activeCount: number;
+    averageTokens: number;
+    lastActivity: string;
+    status: string;
+    metrics: {
+      totalRequests: number;
+      errorRate: number;
+      averageResponseTime: number;
+    };
+  };
+  timestamp: string;
+};
+
+// Real-time monitoring service data (expected by frontend components)
 export type MonitoringData = {
   sessions: MonitoringUpdate[];
   overallStats: {

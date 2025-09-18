@@ -80,7 +80,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           <h3 className="text-lg font-semibold text-white truncate">
             {project.name}
           </h3>
-          <p className="text-sm text-slate-400 truncate mt-1">
+          <p className="mt-1 text-sm text-slate-400 font-mono break-words">
             {project.path}
           </p>
           {project.description && (

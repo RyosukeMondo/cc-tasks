@@ -4,15 +4,16 @@ import { conversationService } from "@/lib/services/conversationService";
 import { projectService } from "@/lib/services/projectService";
 
 interface RouteContext {
-  params: {
-    projectId: string;
-    sessionId: string;
-  };
+  params: Promise<{
+    id?: string;
+    sessionId?: string;
+  }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const projectId = context.params?.projectId;
-  const sessionId = context.params?.sessionId;
+  const params = await context.params;
+  const projectId = params?.id;
+  const sessionId = params?.sessionId;
 
   if (!projectId || !sessionId) {
     return NextResponse.json({ error: "Project ID and session ID are required" }, { status: 400 });

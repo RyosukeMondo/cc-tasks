@@ -262,18 +262,66 @@ const monitoringState = new MonitoringState();
  */
 async function getProjectSessions(projectId: string): Promise<SessionMetadata[]> {
   const key = `getProjectSessions:${projectId}`;
-  
+
   return executeWithRetry(async () => {
     try {
-      // This is a simplified mock - in reality would use sessionService.getProjectSessions
-      // For now, return empty array as we don't have full session service integration
-      
       // Validate input
       if (!projectId || typeof projectId !== 'string') {
         throw new Error('Invalid project ID provided');
       }
-      
-      return [];
+
+      // Get project path
+      const { promises: fs } = await import('fs');
+      const { join } = await import('path');
+      const { homedir } = await import('os');
+
+      const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+      const projectPath = join(CLAUDE_PROJECTS_DIR, projectId);
+
+      try {
+        const files = await fs.readdir(projectPath);
+        const sessionFiles = files.filter(file => file.endsWith('.jsonl') && file !== 'meta.json');
+
+        // Get file stats for each session
+        const sessions: SessionMetadata[] = [];
+
+        for (const file of sessionFiles) {
+          try {
+            const filePath = join(projectPath, file);
+            const stats = await fs.stat(filePath);
+            const sessionId = file.replace('.jsonl', '');
+
+            sessions.push({
+              id: sessionId,
+              fileName: file,
+              filePath,
+              fileSize: stats.size,
+              isAccessible: true,
+              lastModified: stats.mtime.toISOString()
+            });
+          } catch (fileError) {
+            console.warn(`Failed to get stats for session file ${file}:`, fileError);
+          }
+        }
+
+        // Sort by last modified (most recent first) and limit to recent sessions
+        const sortedSessions = sessions.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
+        // Only return sessions modified in the last 24 hours, up to maxSessions limit
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+        const recentSessions = sortedSessions.filter(session =>
+          new Date(session.lastModified).getTime() > twentyFourHoursAgo
+        );
+
+        // Limit to maxSessions (default 25)
+        const maxSessions = 10; // Reduced for better performance
+        return recentSessions.slice(0, maxSessions);
+
+      } catch (dirError) {
+        // If directory doesn't exist or can't be read, return empty array
+        console.warn(`Project directory not accessible: ${projectPath}`, dirError);
+        return [];
+      }
     } catch (error) {
       const enhancedError = new Error(`Failed to get sessions for project ${projectId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw enhancedError;

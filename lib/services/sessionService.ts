@@ -19,12 +19,12 @@ export type SessionService = {
 function validateProjectPath(projectPath: string): string {
   const normalizedPath = path.normalize(projectPath);
   const resolvedPath = path.resolve(normalizedPath);
-  
+
   // Ensure the path is within the Claude projects directory
   if (!resolvedPath.startsWith(path.resolve(CLAUDE_PROJECTS_DIR))) {
     throw new Error('Invalid project path: outside Claude projects directory');
   }
-  
+
   return resolvedPath;
 }
 
@@ -60,6 +60,35 @@ function generateSessionId(fileName: string): string {
   return path.basename(fileName, '.jsonl');
 }
 
+/**
+ * Collects relative JSONL file paths from supported conversation directories.
+ */
+async function collectSessionFiles(validatedPath: string): Promise<string[]> {
+  const results = new Set<string>();
+  const candidateDirs: Array<{ absolutePath: string; relativePrefix: string }> = [
+    { absolutePath: path.join(validatedPath, 'conversations'), relativePrefix: 'conversations' },
+    { absolutePath: validatedPath, relativePrefix: '' },
+  ];
+
+  for (const { absolutePath, relativePrefix } of candidateDirs) {
+    if (!(await isDirectoryAccessible(absolutePath))) {
+      continue;
+    }
+
+    const entries = await fs.readdir(absolutePath);
+    for (const entry of entries) {
+      if (!entry.endsWith('.jsonl')) {
+        continue;
+      }
+
+      const relativePath = relativePrefix ? path.join(relativePrefix, entry) : entry;
+      results.add(relativePath);
+    }
+  }
+
+  return Array.from(results).sort();
+}
+
 export const sessionService: SessionService = {
   /**
    * Scans conversation files in a project directory
@@ -67,18 +96,7 @@ export const sessionService: SessionService = {
   async scanConversationFiles(projectPath: string): Promise<string[]> {
     try {
       const validatedPath = validateProjectPath(projectPath);
-      const conversationsPath = path.join(validatedPath, 'conversations');
-      
-      if (!(await isDirectoryAccessible(conversationsPath))) {
-        return [];
-      }
-      
-      const files = await fs.readdir(conversationsPath);
-      
-      // Filter only .jsonl files
-      const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-      
-      return jsonlFiles.sort();
+      return await collectSessionFiles(validatedPath);
     } catch (error) {
       console.error(`Failed to scan conversation files in ${projectPath}:`, error);
       return [];
@@ -91,10 +109,10 @@ export const sessionService: SessionService = {
   async extractSessionMetadata(sessionFilePath: string): Promise<SessionMetadata> {
     const fileName = path.basename(sessionFilePath);
     const sessionId = generateSessionId(fileName);
-    
+
     try {
       const isAccessible = await isFileAccessible(sessionFilePath);
-      
+
       if (!isAccessible) {
         return {
           id: sessionId,
@@ -105,9 +123,9 @@ export const sessionService: SessionService = {
           isAccessible: false,
         };
       }
-      
+
       const stats = await fs.stat(sessionFilePath);
-      
+
       return {
         id: sessionId,
         fileName,
@@ -118,7 +136,7 @@ export const sessionService: SessionService = {
       };
     } catch (error) {
       console.error(`Failed to extract metadata for session ${fileName}:`, error);
-      
+
       // Return minimal metadata on error
       return {
         id: sessionId,
@@ -137,30 +155,31 @@ export const sessionService: SessionService = {
   async listSessionsForProject(projectId: string): Promise<SessionMetadata[]> {
     try {
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
-      const sessionFiles = await this.scanConversationFiles(projectPath);
+      const validatedPath = validateProjectPath(projectPath);
+      const sessionFiles = await collectSessionFiles(validatedPath);
       const sessions: SessionMetadata[] = [];
-      
-      for (const fileName of sessionFiles) {
+
+      for (const relativeFilePath of sessionFiles) {
         try {
-          const filePath = path.join(projectPath, 'conversations', fileName);
+          const filePath = path.join(validatedPath, relativeFilePath);
           const metadata = await this.extractSessionMetadata(filePath);
           sessions.push(metadata);
         } catch (error) {
-          console.error(`Failed to process session file ${fileName}:`, error);
-          
+          console.error(`Failed to process session file ${relativeFilePath}:`, error);
+
           // Create minimal metadata for inaccessible files
-          const sessionId = generateSessionId(fileName);
+          const sessionId = generateSessionId(relativeFilePath);
           sessions.push({
             id: sessionId,
-            fileName,
-            filePath: path.join(projectPath, 'conversations', fileName),
+            fileName: path.basename(relativeFilePath),
+            filePath: path.join(validatedPath, relativeFilePath),
             fileSize: 0,
             lastModified: new Date().toISOString(),
             isAccessible: false,
           });
         }
       }
-      
+
       // Sort by last modified date (most recent first)
       return sessions.sort((a, b) => 
         new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
@@ -177,14 +196,19 @@ export const sessionService: SessionService = {
   async getSessionMetadata(projectId: string, sessionFileName: string): Promise<SessionMetadata | undefined> {
     try {
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
-      const sessionFilePath = path.join(projectPath, 'conversations', sessionFileName);
-      
-      // Validate that the requested file is a JSONL file
-      if (!sessionFileName.endsWith('.jsonl')) {
+      const validatedPath = validateProjectPath(projectPath);
+      const normalizedFileName = sessionFileName.endsWith('.jsonl')
+        ? sessionFileName
+        : `${sessionFileName}.jsonl`;
+
+      const sessionFiles = await collectSessionFiles(validatedPath);
+      const relativeMatch = sessionFiles.find((relativePath) => path.basename(relativePath) === normalizedFileName);
+
+      if (!relativeMatch) {
         return undefined;
       }
-      
-      return await this.extractSessionMetadata(sessionFilePath);
+
+      return await this.extractSessionMetadata(path.join(validatedPath, relativeMatch));
     } catch (error) {
       console.error(`Failed to get session metadata for ${sessionFileName} in project ${projectId}:`, error);
       return undefined;

@@ -1,24 +1,12 @@
 import { NextResponse } from "next/server";
+import { monitoringService } from "@/lib/services/monitoringService";
+import { SessionControlRequest } from "@/lib/types/monitoring";
 
 interface RouteContext {
   params: Promise<{
     id: string;
   }>;
 }
-
-// Mock monitoring data for development
-const generateMockMonitoringData = () => ({
-  sessionCount: Math.floor(Math.random() * 10) + 1,
-  activeCount: Math.floor(Math.random() * 3),
-  averageTokens: Math.floor(Math.random() * 1000) + 500,
-  lastActivity: new Date().toISOString(),
-  status: "active" as const,
-  metrics: {
-    totalRequests: Math.floor(Math.random() * 100) + 50,
-    errorRate: Math.random() * 0.05,
-    averageResponseTime: Math.floor(Math.random() * 200) + 100,
-  }
-});
 
 export async function GET(_request: Request, context: RouteContext) {
   const { id: projectId } = await context.params;
@@ -28,15 +16,32 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    // For now, return mock data
-    // TODO: Implement actual monitoring data collection
-    const monitoringData = generateMockMonitoringData();
+    // Get real monitoring data from the service
+    const monitoringData = await monitoringService.getMonitoringData(projectId);
 
-    return NextResponse.json({
-      projectId,
-      monitoring: monitoringData,
-      timestamp: new Date().toISOString()
-    });
+    if (!monitoringData) {
+      return NextResponse.json({
+        projectId,
+        sessions: [],
+        overallStats: {
+          activeSessions: 0,
+          totalSessions: 0,
+          averageResponseTime: 0,
+          systemLoad: 0
+        },
+        lastUpdated: new Date().toISOString(),
+        config: {
+          pollInterval: 2000,
+          healthCheckInterval: 5000,
+          staleThreshold: 300000,
+          maxSessions: 25,
+          enableAutoRecovery: true,
+          enableNotifications: false
+        }
+      });
+    }
+
+    return NextResponse.json(monitoringData);
   } catch (error) {
     console.error(`Failed to get monitoring data for project ${projectId}:`, error);
     return NextResponse.json(
@@ -46,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   const { id: projectId } = await context.params;
 
   if (!projectId) {
@@ -54,42 +59,45 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   try {
-    // Mock start monitoring
-    return NextResponse.json({
-      projectId,
-      status: "started",
-      message: "Monitoring started successfully",
-      timestamp: new Date().toISOString()
-    });
+    const body = await request.json();
+    const { action, config, request: controlRequest } = body;
+
+    switch (action) {
+      case 'start':
+        await monitoringService.startMonitoring(projectId, config);
+        return NextResponse.json({
+          projectId,
+          status: "started",
+          message: "Monitoring started successfully",
+          timestamp: new Date().toISOString()
+        });
+
+      case 'stop':
+        await monitoringService.stopMonitoring(projectId);
+        return NextResponse.json({
+          projectId,
+          status: "stopped",
+          message: "Monitoring stopped successfully",
+          timestamp: new Date().toISOString()
+        });
+
+      case 'control':
+        const result = await monitoringService.executeSessionControl(controlRequest as SessionControlRequest);
+        return NextResponse.json(result);
+
+      default:
+        return NextResponse.json(
+          { error: `Unknown action: ${action}` },
+          { status: 400 }
+        );
+    }
   } catch (error) {
-    console.error(`Failed to start monitoring for project ${projectId}:`, error);
+    console.error(`Failed to execute monitoring action for project ${projectId}:`, error);
     return NextResponse.json(
-      { error: "Failed to start monitoring" },
+      { error: "Failed to execute monitoring action" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  const { id: projectId } = await context.params;
-
-  if (!projectId) {
-    return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
-  }
-
-  try {
-    // Mock stop monitoring
-    return NextResponse.json({
-      projectId,
-      status: "stopped",
-      message: "Monitoring stopped successfully",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error(`Failed to stop monitoring for project ${projectId}:`, error);
-    return NextResponse.json(
-      { error: "Failed to stop monitoring" },
-      { status: 500 }
-    );
-  }
-}
+// DELETE method removed - now handled by POST with action: 'stop'

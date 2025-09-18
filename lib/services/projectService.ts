@@ -19,12 +19,12 @@ export type ProjectService = {
 function validateProjectPath(projectPath: string): string {
   const normalizedPath = path.normalize(projectPath);
   const resolvedPath = path.resolve(normalizedPath);
-  
+
   // Ensure the path is within the Claude projects directory
   if (!resolvedPath.startsWith(path.resolve(CLAUDE_PROJECTS_DIR))) {
     throw new Error('Invalid project path: outside Claude projects directory');
   }
-  
+
   return resolvedPath;
 }
 
@@ -55,18 +55,40 @@ async function readProjectMeta(projectPath: string): Promise<Partial<ProjectMeta
 }
 
 /**
- * Counts JSONL files in the conversations directory
+ * Collects absolute paths to JSONL session files for a project.
+ */
+async function listSessionFilePaths(projectPath: string): Promise<string[]> {
+  const files: string[] = [];
+  const candidateDirs = [
+    path.join(projectPath, 'conversations'),
+    projectPath,
+  ];
+
+  for (const dir of candidateDirs) {
+    if (!(await isDirectoryAccessible(dir))) {
+      continue;
+    }
+
+    const entries = await fs.readdir(dir);
+    for (const entry of entries) {
+      if (entry.endsWith('.jsonl')) {
+        files.push(path.join(dir, entry));
+      }
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Counts JSONL files stored for the project regardless of directory structure
  */
 async function countConversationFiles(projectPath: string): Promise<number> {
   try {
-    const conversationsPath = path.join(projectPath, 'conversations');
-    const files = await fs.readdir(conversationsPath);
-    
-    // Count only .jsonl files
-    const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-    return jsonlFiles.length;
+    const files = await listSessionFilePaths(projectPath);
+    return files.length;
   } catch {
-    // Return 0 if conversations directory doesn't exist or is inaccessible
+    // Return 0 if directories don't exist or are inaccessible
     return 0;
   }
 }
@@ -76,19 +98,15 @@ async function countConversationFiles(projectPath: string): Promise<number> {
  */
 async function getLastActivity(projectPath: string): Promise<string | undefined> {
   try {
-    const conversationsPath = path.join(projectPath, 'conversations');
-    const files = await fs.readdir(conversationsPath);
-    
-    const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-    if (jsonlFiles.length === 0) {
+    const files = await listSessionFilePaths(projectPath);
+    if (files.length === 0) {
       return undefined;
     }
-    
+
     let latestTime = 0;
-    
-    for (const file of jsonlFiles) {
+
+    for (const filePath of files) {
       try {
-        const filePath = path.join(conversationsPath, file);
         const stats = await fs.stat(filePath);
         if (stats.mtime.getTime() > latestTime) {
           latestTime = stats.mtime.getTime();
@@ -98,7 +116,7 @@ async function getLastActivity(projectPath: string): Promise<string | undefined>
         continue;
       }
     }
-    
+
     return latestTime > 0 ? new Date(latestTime).toISOString() : undefined;
   } catch {
     return undefined;
@@ -114,17 +132,17 @@ export const projectService: ProjectService = {
       if (!(await isDirectoryAccessible(CLAUDE_PROJECTS_DIR))) {
         return [];
       }
-      
+
       const entries = await fs.readdir(CLAUDE_PROJECTS_DIR);
       const projectDirs: string[] = [];
-      
+
       for (const entry of entries) {
         const entryPath = path.join(CLAUDE_PROJECTS_DIR, entry);
         if (await isDirectoryAccessible(entryPath)) {
           projectDirs.push(entry);
         }
       }
-      
+
       return projectDirs.sort();
     } catch (error) {
       console.error('Failed to scan projects directory:', error);
@@ -138,18 +156,18 @@ export const projectService: ProjectService = {
   async extractProjectMetadata(projectPath: string): Promise<ProjectMeta> {
     const validatedPath = validateProjectPath(projectPath);
     const projectName = path.basename(validatedPath);
-    
+
     try {
       const stats = await fs.stat(validatedPath);
       const sessionCount = await countConversationFiles(validatedPath);
       const lastActivity = await getLastActivity(validatedPath);
-      
+
       // Try to read meta.json for additional metadata
       const metaData = await readProjectMeta(validatedPath);
       const description = (typeof metaData?.description === 'string' && metaData.description.trim().length > 0)
         ? metaData.description.trim()
         : undefined;
-      
+
       return {
         name: metaData?.name || projectName,
         path: validatedPath,
@@ -160,7 +178,7 @@ export const projectService: ProjectService = {
       };
     } catch (error) {
       console.error(`Failed to extract metadata for project ${projectName}:`, error);
-      
+
       // Return minimal metadata on error
       return {
         name: projectName,
@@ -178,12 +196,12 @@ export const projectService: ProjectService = {
     try {
       const projectDirs = await this.scanProjectsDirectory();
       const projects: Project[] = [];
-      
+
       for (const projectDir of projectDirs) {
         try {
           const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectDir);
           const meta = await this.extractProjectMetadata(projectPath);
-          
+
           const project: Project = {
             id: projectDir,
             name: meta.name,
@@ -196,14 +214,14 @@ export const projectService: ProjectService = {
             description: meta.description,
             hasValidMeta: await readProjectMeta(projectPath) !== null,
           };
-          
+
           projects.push(project);
         } catch (error) {
           console.error(`Failed to process project ${projectDir}:`, error);
           // Continue processing other projects even if one fails
         }
       }
-      
+
       // Sort by last modified date (most recent first)
       return projects.sort((a, b) => 
         new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
@@ -229,6 +247,3 @@ export const projectService: ProjectService = {
 };
 
 export const mockProjectService = projectService;
-
-
-

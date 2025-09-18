@@ -253,14 +253,12 @@ export default function MonitoringDashboardPage() {
     void refresh();
   }, [refresh]);
 
-  const metrics = useMemo(() => {
-    if (!monitoringData) return [] as MonitoringMetricProps[];
+  const metrics = useMemo((): MonitoringMetricProps[] => {
+    if (!monitoringData) return [];
 
     const { activeSessions, totalSessions, averageResponseTime, systemLoad } = monitoringData.overallStats;
-    const responseTone: MonitoringMetricProps["tone"] = averageResponseTime > 2000 ? "warning" : averageResponseTime > 1000 ? "default" : "positive";
-    const loadTone: MonitoringMetricProps["tone"] = systemLoad > 80 ? "warning" : systemLoad > 50 ? "default" : "positive";
 
-    return [
+    const metricsArray: MonitoringMetricProps[] = [
       {
         label: "Active Sessions",
         value: activeSessions.toString(),
@@ -271,20 +269,23 @@ export default function MonitoringDashboardPage() {
         label: "Average Response",
         value: averageResponseTime ? `${Math.round(averageResponseTime)} ms` : "No data",
         helper: averageResponseTime ? formatRelativeTime(monitoringData.lastUpdated) : undefined,
-        tone: responseTone,
+        tone: averageResponseTime > 2000 ? "warning" : averageResponseTime > 1000 ? "default" : "positive",
       },
       {
         label: "System Load",
         value: `${Math.round(systemLoad)}%`,
         helper: systemLoad > 90 ? "Consider reducing concurrency" : "",
-        tone: loadTone,
+        tone: systemLoad > 80 ? "warning" : systemLoad > 50 ? "default" : "positive",
       },
       {
         label: "Last Updated",
         value: formatTimestamp(monitoringData.lastUpdated),
         helper: formatRelativeTime(monitoringData.lastUpdated),
+        tone: "default",
       },
     ];
+
+    return metricsArray;
   }, [monitoringData]);
 
   if (isLoadingProject) {

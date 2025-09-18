@@ -134,7 +134,7 @@ export function ConversationNavigation({
     [onJumpToPosition, totalEntries]
   );
 
-  const displaySessionId = sessionId.length > 12 ? `${sessionId.slice(0, 6)}c${sessionId.slice(-4)}` : sessionId;
+  const displaySessionId = sessionId.length > 12 ? `${sessionId.slice(0, 6)}...${sessionId.slice(-4)}` : sessionId;
 
   return (
     <div className={`${cardSurface} p-4 ${className}`.trim()}>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { monitoringService } from "@/lib/services/monitoringService";
 
 interface RouteContext {
   params: Promise<{
@@ -14,15 +15,16 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    // Mock monitoring status
-    const isActive = Math.random() > 0.3; // 70% chance of being active
+    const isActive = monitoringService.isMonitoring(projectId);
+    const monitoringData = await monitoringService.getMonitoringData(projectId);
 
     return NextResponse.json({
       projectId,
+      isActive,
       isMonitoring: isActive,
       status: isActive ? "active" : "inactive",
-      lastUpdate: new Date().toISOString(),
-      health: "good"
+      lastUpdate: monitoringData?.lastUpdated || new Date().toISOString(),
+      health: monitoringData ? "good" : "unknown"
     });
   } catch (error) {
     console.error(`Failed to get monitoring status for project ${projectId}:`, error);

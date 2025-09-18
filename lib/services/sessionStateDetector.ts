@@ -63,27 +63,44 @@ async function getFileModificationTime(filePath: string): Promise<Date | null> {
  */
 async function readLastLines(filePath: string, lineCount: number = 10): Promise<string[]> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      // Check file size first - skip very large files
+      const stats = await fs.stat(filePath);
+      const maxFileSize = 10 * 1024 * 1024; // 10MB limit
+
+      if (stats.size > maxFileSize) {
+        console.warn(`File too large (${stats.size} bytes), skipping: ${filePath}`);
+        return [];
+      }
+
+      // Add timeout to prevent hanging on large files
+      const readPromise = fs.readFile(filePath, 'utf-8');
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('File read timeout')), 5000); // 5 second timeout
+      });
+
+      const content = await Promise.race([readPromise, timeoutPromise]);
       const lines = content.split('\n').filter(line => line.trim());
       return lines.slice(-lineCount);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown file read error');
-      
+
       // Don't retry for certain errors
-      if (lastError.message.includes('ENOENT') || lastError.message.includes('EACCES')) {
+      if (lastError.message.includes('ENOENT') ||
+          lastError.message.includes('EACCES') ||
+          lastError.message.includes('timeout')) {
         break;
       }
-      
+
       // Wait before retry (exponential backoff)
       if (attempt < MAX_RETRY_ATTEMPTS - 1) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * Math.pow(2, attempt)));
       }
     }
   }
-  
+
   if (lastError) {
     console.warn(`Failed to read file ${filePath} after ${MAX_RETRY_ATTEMPTS} attempts:`, lastError.message);
   }
@@ -224,7 +241,7 @@ export const sessionStateDetector: SessionStateDetector = {
       
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
       const validatedPath = validateProjectPath(projectPath);
-      const sessionFilePath = path.join(validatedPath, 'conversations', `${sessionId}.jsonl`);
+      const sessionFilePath = path.join(validatedPath, `${sessionId}.jsonl`);
       
       // Check if session file exists
       if (!(await isFileAccessible(sessionFilePath))) {
@@ -267,7 +284,7 @@ export const sessionStateDetector: SessionStateDetector = {
     try {
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
       const validatedPath = validateProjectPath(projectPath);
-      const sessionFilePath = path.join(validatedPath, 'conversations', `${sessionId}.jsonl`);
+      const sessionFilePath = path.join(validatedPath, `${sessionId}.jsonl`);
       
       const lastModified = await getFileModificationTime(sessionFilePath);
       const lastActivityAt = lastModified ? lastModified.toISOString() : new Date().toISOString();
@@ -331,7 +348,7 @@ export const sessionStateDetector: SessionStateDetector = {
     try {
       const projectPath = path.join(CLAUDE_PROJECTS_DIR, projectId);
       const validatedPath = validateProjectPath(projectPath);
-      const sessionFilePath = path.join(validatedPath, 'conversations', `${sessionId}.jsonl`);
+      const sessionFilePath = path.join(validatedPath, `${sessionId}.jsonl`);
       
       // Get session state and health
       const [state, health] = await Promise.all([
