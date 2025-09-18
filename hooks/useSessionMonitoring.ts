@@ -9,7 +9,7 @@ import {
   SessionControlResult,
   MonitoringConfig 
 } from "@/lib/types/monitoring";
-import { monitoringService } from "@/lib/services/monitoringService";
+// Using API routes instead of direct service import for client-side compatibility
 
 type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -188,7 +188,13 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     
     try {
       const data = await executeWithRetry(
-        () => monitoringService.getMonitoringData(projectId),
+        async () => {
+          const response = await fetch(`/api/projects/${projectId}/monitoring`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch monitoring data: ${response.statusText}`);
+          }
+          return response.json();
+        },
         'loadMonitoringData'
       );
       
@@ -242,7 +248,17 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     
     try {
       await executeWithRetry(
-        () => monitoringService.startMonitoring(projectId, config),
+        async () => {
+          const response = await fetch(`/api/projects/${projectId}/monitoring`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start', config })
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to start monitoring: ${response.statusText}`);
+          }
+          return response.json();
+        },
         'startMonitoring'
       );
       
@@ -269,7 +285,17 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     
     try {
       await executeWithRetry(
-        () => monitoringService.stopMonitoring(projectId),
+        async () => {
+          const response = await fetch(`/api/projects/${projectId}/monitoring`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'stop' })
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to stop monitoring: ${response.statusText}`);
+          }
+          return response.json();
+        },
         'stopMonitoring',
         2 // Fewer retries for stop operations
       );
@@ -290,14 +316,27 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
 
   // Check if monitoring is active and initialize if needed
   useEffect(() => {
-    const isActive = monitoringService.isMonitoring(projectId);
-    setIsMonitoring(isActive);
+    // Use API to check if monitoring is active
+    const checkMonitoringStatus = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/monitoring/status`);
+        if (response.ok) {
+          const { isActive } = await response.json();
+          setIsMonitoring(isActive);
+          
+          if (isActive) {
+            // Load initial data and start polling
+            void loadMonitoringData();
+            startPolling();
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to check monitoring status:', error);
+        setIsMonitoring(false);
+      }
+    };
     
-    if (isActive) {
-      // Load initial data and start polling
-      void loadMonitoringData();
-      startPolling();
-    }
+    void checkMonitoringStatus();
   }, [projectId, loadMonitoringData, startPolling]);
 
   // Get sorted sessions
@@ -328,7 +367,17 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
       
       try {
         const result = await executeWithRetry(
-          () => monitoringService.executeSessionControl(request),
+          async () => {
+            const response = await fetch(`/api/projects/${projectId}/monitoring`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'control', request })
+            });
+            if (!response.ok) {
+              throw new Error(`Failed to execute control: ${response.statusText}`);
+            }
+            return response.json();
+          },
           `executeControl:${request.action}`,
           2 // Fewer retries for control operations
         );
