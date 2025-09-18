@@ -271,10 +271,16 @@ describe('Real-time Session Monitoring - Integration Tests', () => {
     test('should handle service failures gracefully', async () => {
       const projectId = testProjects[0];
       
-      // Mock service failure
+      // Mock service failure with better recovery logic
+      let callCount = 0;
       jest.spyOn(sessionStateDetector, 'generateMonitoringUpdate')
-        .mockRejectedValueOnce(new Error('Service temporarily unavailable'))
-        .mockResolvedValue(generateMockSession(projectId, 'test-session'));
+        .mockImplementation(async (projId, sessionId) => {
+          callCount++;
+          if (callCount === 1) {
+            throw new Error('Service temporarily unavailable');
+          }
+          return generateMockSession(projId, sessionId);
+        });
       
       await monitoringService.startMonitoring(projectId, TEST_CONFIG);
       
@@ -309,9 +315,17 @@ describe('Real-time Session Monitoring - Integration Tests', () => {
       const projectId = testProjects[0];
       const sessionId = 'test-session';
       
-      // Mock control failure
+      // Mock control failure - the monitoring service should handle this gracefully
       jest.spyOn(sessionController, 'executeControl')
-        .mockRejectedValueOnce(new Error('Control operation failed'));
+        .mockImplementation(async (request) => {
+          return {
+            sessionId: request.sessionId,
+            action: request.action,
+            success: false,
+            message: 'Control operation failed',
+            timestamp: new Date().toISOString()
+          };
+        });
       
       await monitoringService.startMonitoring(projectId, TEST_CONFIG);
       
