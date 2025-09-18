@@ -444,7 +444,7 @@ describe('Real-time Session Monitoring Integration Tests', () => {
 
     test('should maintain responsive polling under load', async () => {
       await monitoringService.startMonitoring(TEST_PROJECT_ID, {
-        pollInterval: 500,
+        pollInterval: 1000,
         healthCheckInterval: 2000,
         staleThreshold: 10000,
         maxSessions: 15,
