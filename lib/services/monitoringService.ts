@@ -4,6 +4,7 @@ import {
   MonitoringUpdate, 
   MonitoringConfig, 
   SessionState,
+  SessionControls,
   SessionControlRequest,
   SessionControlResult
 } from '@/lib/types/monitoring';
@@ -12,10 +13,10 @@ import { sessionController } from './sessionController';
 
 // Default configuration for monitoring - Optimized for performance
 const DEFAULT_CONFIG: MonitoringConfig = {
-  pollInterval: 800,         // 800ms - optimized for sub-1s updates
+  pollInterval: 1000,        // 1s - balanced for performance and responsiveness
   healthCheckInterval: 5000, // 5 seconds - more frequent health checks
   staleThreshold: 300000,    // 5 minutes
-  maxSessions: 50,
+  maxSessions: 25,           // Reduced for better performance with many projects
   enableAutoRecovery: true,  // Enable auto-recovery for better reliability
   enableNotifications: false
 };
@@ -188,12 +189,14 @@ export type MonitoringService = {
   getActiveProjects: () => string[];
 };
 
-// Internal monitoring state management
+// Internal monitoring state management with memory optimization
 class MonitoringState {
   private activeMonitors = new Map<string, NodeJS.Timeout>();
   private monitoringData = new Map<string, MonitoringData>();
   private configs = new Map<string, MonitoringConfig>();
   private lastHealthChecks = new Map<string, number>();
+  private dataCache = new Map<string, { data: MonitoringData; timestamp: number }>();
+  private readonly CACHE_TTL = 500; // 500ms cache for high-frequency requests
 
   isActive(projectId: string): boolean {
     return this.activeMonitors.has(projectId);
@@ -386,16 +389,27 @@ async function updateProjectMonitoring(projectId: string): Promise<void> {
       const updatePromises = sessionsToMonitor.map(async (sessionMeta) => {
         const sessionKey = `sessionUpdate:${sessionMeta.id}`;
         try {
-          return await executeWithRetry(async () => {
+          const update = await executeWithRetry(async () => {
             return sessionStateDetector.generateMonitoringUpdate(
-              projectId, 
+              projectId,
               sessionMeta.id
             );
-          }, sessionKey, 2); // Fewer retries for individual sessions
+          }, sessionKey, 2);
+
+          let controls: SessionControls | undefined;
+          try {
+            controls = await sessionController.getSessionControls(projectId, sessionMeta.id);
+          } catch (controlError) {
+            const error = controlError instanceof Error ? controlError : new Error('Unknown control retrieval error');
+            errorHandler.recordError(`${sessionKey}:controls`, error, 'low');
+            console.warn(`Failed to load controls for session ${sessionMeta.id}:`, error.message);
+          }
+
+          return controls ? { ...update, controls } : update;
         } catch (error) {
           errorHandler.recordError(sessionKey, error instanceof Error ? error : new Error('Session update failed'), 'low');
           console.error(`Failed to get monitoring update for session ${sessionMeta.id}:`, error);
-          
+
           // Return a minimal error update for graceful degradation
           return {
             sessionId: sessionMeta.id,
@@ -416,11 +430,19 @@ async function updateProjectMonitoring(projectId: string): Promise<void> {
               lastUpdateAt: new Date().toISOString(),
               errorContext: 'monitoring_update_failed'
             },
-            timestamp: new Date().toISOString()
-          };
+            timestamp: new Date().toISOString(),
+            controls: {
+              sessionId: sessionMeta.id,
+              projectId,
+              availableActions: [],
+              canPause: false,
+              canResume: false,
+              canTerminate: false,
+              canRestart: false
+            }
+          } as MonitoringUpdate;
         }
       });
-
       // Use allSettled to handle partial failures gracefully
       const settledResults = await Promise.allSettled(updatePromises);
       const updates = settledResults
@@ -687,3 +709,4 @@ if (typeof process !== 'undefined') {
   process.on('SIGTERM', shutdownMonitoring);
   process.on('SIGINT', shutdownMonitoring);
 }
+

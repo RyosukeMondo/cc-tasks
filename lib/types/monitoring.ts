@@ -41,6 +41,7 @@ export type MonitoringUpdate = {
     environment?: string;
   };
   timestamp: string;
+  controls?: SessionControls;
 };
 
 // Session control operations

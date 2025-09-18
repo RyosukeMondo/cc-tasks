@@ -91,15 +91,17 @@ export function SessionCard({
   const hasMonitoringData = !!monitoringData;
   const currentSessionState = monitoringData?.state;
   const sessionProgress = monitoringData?.progress;
-  const sessionControls = monitoringData ? {
-    sessionId: monitoringData.sessionId,
-    projectId: monitoringData.projectId,
-    availableActions: ['pause', 'resume', 'terminate', 'restart'] as const,
-    canPause: currentSessionState === 'active' || currentSessionState === 'idle',
-    canResume: currentSessionState === 'paused',
-    canTerminate: currentSessionState !== 'terminated',
-    canRestart: true
-  } : null;
+  const sessionControls = monitoringData
+    ? monitoringData.controls ?? {
+        sessionId: monitoringData.sessionId,
+        projectId: monitoringData.projectId,
+        availableActions: ['pause', 'resume', 'terminate', 'restart'] as const,
+        canPause: currentSessionState === 'active' || currentSessionState === 'idle',
+        canResume: currentSessionState === 'paused',
+        canTerminate: currentSessionState !== 'terminated',
+        canRestart: true
+      }
+    : null;
 
   const handleViewContent = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -198,3 +200,4 @@ export function SessionCard({
     </div>
   );
 }
+

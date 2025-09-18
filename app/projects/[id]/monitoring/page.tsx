@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { ProjectNavigation } from "@/components/projects/ProjectNavigation";
@@ -12,6 +12,160 @@ import { projectService } from "@/lib/services/projectService";
 import { Project } from "@/lib/types/project";
 import { MonitoringUpdate } from "@/lib/types/monitoring";
 import { cardSurface } from "@/lib/ui/layout";
+
+type ConnectionStatus = "connected" | "connecting" | "disconnected" | "error";
+
+type MonitoringMetricProps = {
+  label: string;
+  value: string;
+  helper?: string;
+  tone?: "default" | "positive" | "warning";
+};
+
+const CONNECTION_STYLES: Record<ConnectionStatus, { label: string; className: string }> = {
+  connected: {
+    label: "Live",
+    className: "bg-emerald-500/15 text-emerald-200 border border-emerald-500/40",
+  },
+  connecting: {
+    label: "Connecting",
+    className: "bg-blue-500/15 text-blue-200 border border-blue-500/40",
+  },
+  disconnected: {
+    label: "Paused",
+    className: "bg-slate-700/60 text-slate-200 border border-slate-600/60",
+  },
+  error: {
+    label: "Degraded",
+    className: "bg-amber-500/15 text-amber-100 border border-amber-500/40",
+  },
+};
+
+function formatRelativeTime(timestamp?: string | null): string {
+  if (!timestamp) return "?";
+  const target = new Date(timestamp);
+  if (Number.isNaN(target.getTime())) return "?";
+
+  const diffMs = Date.now() - target.getTime();
+  const diffMinutes = Math.round(diffMs / 60000);
+
+  if (diffMinutes <= 0) return "moments ago";
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hr${diffHours === 1 ? "" : "s"} ago`;
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
+function formatTimestamp(timestamp?: string | null): string {
+  if (!timestamp) return "?";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "?";
+  return date.toLocaleTimeString();
+}
+
+function formatBytes(bytes?: number | null): string {
+  if (!bytes || bytes <= 0) return "?";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function MonitoringMetric({ label, value, helper, tone = "default" }: MonitoringMetricProps) {
+  const toneClasses = {
+    default: "text-slate-300",
+    positive: "text-emerald-300",
+    warning: "text-amber-300",
+  } as const;
+
+  return (
+    <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
+      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 text-lg font-semibold ${toneClasses[tone]}`}>{value}</div>
+      {helper && <div className="mt-1 text-xs text-slate-500">{helper}</div>}
+    </div>
+  );
+}
+
+function ConnectionBadge({ status }: { status: ConnectionStatus }) {
+  const config = CONNECTION_STYLES[status] ?? CONNECTION_STYLES.disconnected;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${config.className}`}
+      role="status"
+    >
+      <span className="size-2 rounded-full bg-current" aria-hidden="true" />
+      {config.label}
+    </span>
+  );
+}
+
+function SessionHealthQuickFacts({ session }: { session: MonitoringUpdate }) {
+  const { health } = session;
+
+  return (
+    <div className={`${cardSurface} p-4`}>
+      <h3 className="text-sm font-semibold text-white">Session Health</h3>
+      <dl className="mt-3 grid gap-3 text-xs text-slate-300 sm:grid-cols-2">
+        <div>
+          <dt className="text-slate-500">Last activity</dt>
+          <dd className="font-mono text-slate-200">{formatRelativeTime(health.lastActivityAt)}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Response time</dt>
+          <dd className={health.responseTime && health.responseTime > 5000 ? "text-amber-300" : "text-slate-200"}>
+            {health.responseTime ? `${Math.round(health.responseTime)} ms` : "?"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Memory usage</dt>
+          <dd>{formatBytes(health.memoryUsage)}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">CPU</dt>
+          <dd className={health.cpuUsage && health.cpuUsage > 60 ? "text-amber-300" : "text-slate-200"}>
+            {typeof health.cpuUsage === "number" ? `${health.cpuUsage.toFixed(1)}%` : "?"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Errors</dt>
+          <dd className={health.errorCount > 0 ? "text-rose-300" : "text-slate-200"}>{health.errorCount}</dd>
+        </div>
+      </dl>
+
+      {health.warnings.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="text-xs font-medium text-amber-300">Warnings</div>
+          {health.warnings.slice(0, 3).map((warning, index) => (
+            <div
+              key={`${session.sessionId}-warning-${index}`}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100"
+            >
+              {warning}
+            </div>
+          ))}
+          {health.warnings.length > 3 && (
+            <div className="text-xs text-slate-500">+{health.warnings.length - 3} more warning(s)</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MonitoringDashboardPage() {
   const params = useParams();
@@ -31,12 +185,15 @@ export default function MonitoringDashboardPage() {
     startMonitoring,
     stopMonitoring,
     refresh,
+    retryOperation,
+    clearError,
     isMonitoring,
     isLoading,
     error: monitoringError,
+    errorInfo,
+    connectionStatus,
   } = useSessionMonitoring(projectId || "");
 
-  // Load project metadata
   useEffect(() => {
     const loadProject = async () => {
       if (!projectId) {
@@ -51,7 +208,7 @@ export default function MonitoringDashboardPage() {
 
         const projectList = await projectService.listProjects();
         const foundProject = projectList.find((item) => item.id === projectId);
-        
+
         if (!foundProject) {
           setProjectError(`Project "${projectId}" not found`);
           setIsLoadingProject(false);
@@ -70,7 +227,6 @@ export default function MonitoringDashboardPage() {
     void loadProject();
   }, [projectId]);
 
-  // Auto-start monitoring when component mounts
   useEffect(() => {
     if (projectId && !isMonitoring && !isLoading) {
       void startMonitoring({ pollInterval: 2000 });
@@ -78,6 +234,8 @@ export default function MonitoringDashboardPage() {
   }, [projectId, isMonitoring, isLoading, startMonitoring]);
 
   const handleToggleMonitoring = useCallback(async () => {
+    if (!projectId) return;
+
     try {
       if (isMonitoring) {
         await stopMonitoring();
@@ -87,7 +245,45 @@ export default function MonitoringDashboardPage() {
     } catch (err) {
       console.error("Failed to toggle monitoring:", err);
     }
-  }, [isMonitoring, startMonitoring, stopMonitoring]);
+  }, [isMonitoring, projectId, startMonitoring, stopMonitoring]);
+
+  const handleRefresh = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+
+  const metrics = useMemo(() => {
+    if (!monitoringData) return [] as MonitoringMetricProps[];
+
+    const { activeSessions, totalSessions, averageResponseTime, systemLoad } = monitoringData.overallStats;
+    const responseTone: MonitoringMetricProps["tone"] = averageResponseTime > 2000 ? "warning" : averageResponseTime > 1000 ? "default" : "positive";
+    const loadTone: MonitoringMetricProps["tone"] = systemLoad > 80 ? "warning" : systemLoad > 50 ? "default" : "positive";
+
+    return [
+      {
+        label: "Active Sessions",
+        value: activeSessions.toString(),
+        helper: `${totalSessions} tracked`,
+        tone: activeSessions > 0 ? "positive" : "default",
+      },
+      {
+        label: "Average Response",
+        value: averageResponseTime ? `${Math.round(averageResponseTime)} ms` : "No data",
+        helper: averageResponseTime ? formatRelativeTime(monitoringData.lastUpdated) : undefined,
+        tone: responseTone,
+      },
+      {
+        label: "System Load",
+        value: `${Math.round(systemLoad)}%`,
+        helper: systemLoad > 90 ? "Consider reducing concurrency" : "",
+        tone: loadTone,
+      },
+      {
+        label: "Last Updated",
+        value: formatTimestamp(monitoringData.lastUpdated),
+        helper: formatRelativeTime(monitoringData.lastUpdated),
+      },
+    ];
+  }, [monitoringData]);
 
   if (isLoadingProject) {
     return (
@@ -106,7 +302,7 @@ export default function MonitoringDashboardPage() {
       <div className="min-h-screen bg-slate-950 text-slate-100">
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 pb-24 pt-16">
           <ProjectNavigation currentProjectName="Error" />
-          
+
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-8 text-center">
             <h1 className="mb-2 text-xl font-bold text-rose-200">Project Not Found</h1>
             <p className="text-sm text-rose-300">{projectError}</p>
@@ -120,265 +316,248 @@ export default function MonitoringDashboardPage() {
     return null;
   }
 
+  const hasLiveData = Boolean(monitoringData && sessions.length > 0);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 pb-24 pt-16">
         <ProjectNavigation
           currentProjectName={project.name}
           currentProjectId={project.id}
-          showBackButton={true}
+          showBackButton
         />
 
-        <header className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-white">Session Monitoring</h1>
-              <p className="text-sm text-slate-400">
-                Real-time monitoring for all active Claude Code sessions in {project.name}
-              </p>
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-sm text-slate-400">
+              <span className="uppercase tracking-widest text-xs text-slate-500">Monitoring</span>
+              <ConnectionBadge status={connectionStatus} />
             </div>
-            
-            <div className="flex items-center gap-4">
-              <button
-                onClick={refresh}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-700/50 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600/50 focus:bg-slate-600/50 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
-                aria-label="Refresh monitoring data"
-              >
-                <svg 
-                  className={`size-4 ${isLoading ? "animate-spin" : ""}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-                  />
-                </svg>
-                Refresh
-              </button>
-              
-              <button
-                onClick={handleToggleMonitoring}
-                disabled={isLoading}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50 ${
-                  isMonitoring
-                    ? "bg-red-600/20 text-red-300 hover:bg-red-600/30"
-                    : "bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
-                }`}
-              >
-                <div 
-                  className={`size-2 rounded-full ${
-                    isMonitoring ? "bg-red-400 animate-pulse" : "bg-slate-400"
-                  }`} 
-                />
-                {isMonitoring ? "Stop Monitoring" : "Start Monitoring"}
-              </button>
+            <h1 className="text-2xl font-bold text-white">{project.name}</h1>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Project ID:</span>
+                <code className="rounded bg-slate-900 px-2 py-1 text-slate-300">{project.id}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Latest update:</span>
+                <span className="font-mono text-slate-300">{formatTimestamp(monitoringData?.lastUpdated)}</span>
+              </div>
             </div>
           </div>
 
-          {/* Monitoring Status */}
-          <div className="flex items-center gap-4 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Status:</span>
-              <span className={isMonitoring ? "text-emerald-300" : "text-slate-300"}>
-                {isMonitoring ? "Active" : "Inactive"}
-              </span>
-            </div>
-            {monitoringData && (
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Active Sessions:</span>
-                <span className="text-white">{sessions.length}</span>
-              </div>
-            )}
-            {monitoringData?.lastUpdated && (
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Last Update:</span>
-                <span className="font-mono text-slate-300">
-                  {new Date(monitoringData.lastUpdated).toLocaleTimeString()}
-                </span>
-              </div>
-            )}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleToggleMonitoring}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 ${
+                isMonitoring
+                  ? "border border-white/10 bg-slate-800 text-slate-100 hover:bg-slate-700"
+                  : "bg-emerald-600/80 text-white hover:bg-emerald-500"
+              }`}
+            >
+              {isMonitoring ? "Pause Monitoring" : "Start Monitoring"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isLoading || !isMonitoring}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Refresh
+            </button>
           </div>
-
-          {/* Error Display */}
-          {monitoringError && (
-            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-4">
-              <div className="flex items-start gap-3">
-                <svg className="size-5 text-rose-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <div>
-                  <h3 className="text-sm font-medium text-rose-200">Monitoring Error</h3>
-                  <p className="text-sm text-rose-300 mt-1">{monitoringError.message}</p>
-                </div>
-              </div>
-            </div>
-          )}
         </header>
 
-        <main className="flex-1 space-y-6">
-          {!isMonitoring && !monitoringError && (
-            <div className={`text-center py-12 ${cardSurface}`}>
-              <div className="space-y-4">
-                <div className="mx-auto size-16 rounded-full bg-slate-700/50 flex items-center justify-center">
-                  <svg className="size-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-white mb-2">Monitoring Inactive</h3>
-                  <p className="text-sm text-slate-400 mb-4">
-                    Start monitoring to view real-time session data and controls
-                  </p>
-                  <button
-                    onClick={handleToggleMonitoring}
-                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                  >
-                    Start Monitoring
-                  </button>
-                </div>
-              </div>
+        {monitoringError && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <div className="font-semibold">Live updates interrupted</div>
+            <p className="mt-1 text-amber-100/80">
+              {monitoringError.message}
+              {errorInfo?.operation && ` (${errorInfo.operation})`}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {errorInfo?.retryable && (
+                <button
+                  type="button"
+                  onClick={() => void retryOperation()}
+                  className="rounded-lg bg-amber-400/20 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-400/25"
+                >
+                  Retry operation
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => clearError()}
+                className="rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-400/10"
+              >
+                Dismiss
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {isMonitoring && sessions.length === 0 && !isLoading && (
-            <div className={`text-center py-12 ${cardSurface}`}>
-              <div className="space-y-4">
-                <div className="mx-auto size-16 rounded-full bg-slate-700/50 flex items-center justify-center">
-                  <svg className="size-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-white mb-2">No Active Sessions</h3>
-                  <p className="text-sm text-slate-400">
-                    No Claude Code sessions are currently running for this project
-                  </p>
-                </div>
+        {metrics.length > 0 && (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((metric) => (
+              <MonitoringMetric key={metric.label} {...metric} />
+            ))}
+          </section>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[340px,1fr]">
+          <aside className={`${cardSurface} flex flex-col gap-4 p-4`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white">Sessions</h2>
+                <p className="text-xs text-slate-500">{sessions.length} tracked</p>
               </div>
-            </div>
-          )}
-
-          {/* Sessions Grid */}
-          {sessions.length > 0 && (
-            <div className="space-y-6">
-              {/* Session List */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-white">Active Sessions ({sessions.length})</h2>
-                
-                <div className="space-y-3">
-                  {sessions.map((session) => (
-                    <SessionCard
-                      key={session.sessionId}
-                      session={session}
-                      isSelected={selectedSessionId === session.sessionId}
-                      onSelect={() => selectSession(session.sessionId)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Selected Session Details */}
-              {selectedSession && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">Session Details</h2>
-                    <code className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">
-                      {selectedSession.sessionId}
-                    </code>
-                  </div>
-
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Progress Display */}
-                    <SessionProgressDisplay 
-                      sessionData={selectedSession}
-                      className="lg:col-span-1"
-                    />
-
-                    {/* Control Panel */}
-                    <div className={`${cardSurface} p-4`}>
-                      <h3 className="text-sm font-semibold text-white mb-4">Session Controls</h3>
-                      <SessionControlPanel
-                        sessionId={selectedSession.sessionId}
-                        projectId={projectId || ""}
-                        currentState={selectedSession.sessionState}
-                        controls={selectedSession.controls}
-                        onControlAction={executeControl}
-                      />
-                    </div>
-                  </div>
-                </div>
+              {isMonitoring && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  Auto-refresh {monitoringData ? "on" : "pending"}
+                </span>
               )}
             </div>
-          )}
-        </main>
+
+            {!isMonitoring && (
+              <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-xs text-slate-400">
+                <p className="font-medium text-slate-200">Monitoring paused</p>
+                <p className="mt-1">
+                  Start monitoring to capture live session activity, token usage, and health signals for this project.
+                </p>
+              </div>
+            )}
+
+            {isMonitoring && !hasLiveData && (
+              <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-xs text-slate-400">
+                <p className="font-medium text-slate-200">No active sessions yet</p>
+                <p className="mt-1">Sessions will appear here as soon as Claude Code activity starts for this project.</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {sessions.map((session) => (
+                <MonitoringSessionRow
+                  key={session.sessionId}
+                  session={session}
+                  isSelected={selectedSessionId === session.sessionId}
+                  onSelect={() => selectSession(session.sessionId)}
+                />
+              ))}
+            </div>
+          </aside>
+
+          <section className="space-y-6">
+            {selectedSession ? (
+              <div className={`${cardSurface} flex flex-col gap-4 p-5`}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <SessionStatusIndicator status={selectedSession.state} size="md" />
+                      <h2 className="text-lg font-semibold text-white">Session {selectedSession.sessionId}</h2>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                      <span>Updated {formatRelativeTime(selectedSession.timestamp)}</span>
+                      {selectedSession.metadata.startedAt && (
+                        <span>Started {formatRelativeTime(selectedSession.metadata.startedAt)}</span>
+                      )}
+                      {selectedSession.metadata.processId && (
+                        <span>PID {selectedSession.metadata.processId}</span>
+                      )}
+                    </div>
+                    {selectedSession.progress.currentActivity && (
+                      <div className="mt-3 text-sm text-slate-300">
+                        {selectedSession.progress.currentActivity}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end text-right text-xs text-slate-500">
+                    <span>Total tokens</span>
+                    <span className="font-mono text-sm text-slate-200">
+                      {selectedSession.progress.tokenUsage.totalTokens.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <SessionProgressDisplay sessionData={selectedSession} className="lg:col-span-2" />
+
+                  <SessionControlPanel
+                    sessionId={selectedSession.sessionId}
+                    projectId={projectId || ""}
+                    currentState={selectedSession.state}
+                    controls={selectedSession.controls ?? {
+                      sessionId: selectedSession.sessionId,
+                      projectId: selectedSession.projectId,
+                      availableActions: ['pause', 'resume', 'terminate', 'restart'] as const,
+                      canPause: selectedSession.state === 'active' || selectedSession.state === 'idle',
+                      canResume: selectedSession.state === 'paused',
+                      canTerminate: selectedSession.state !== 'terminated',
+                      canRestart: true,
+                    }}
+                    onControlAction={executeControl}
+                  />
+
+                  <SessionHealthQuickFacts session={selectedSession} />
+                </div>
+              </div>
+            ) : (
+              <div className={`${cardSurface} flex h-full min-h-[280px] items-center justify-center p-10 text-center text-sm text-slate-400`}>
+                Select a session to inspect live progress, token usage, and control options.
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
 
-type SessionCardProps = {
+type MonitoringSessionRowProps = {
   session: MonitoringUpdate;
   isSelected: boolean;
   onSelect: () => void;
 };
 
-function SessionCard({ session, isSelected, onSelect }: SessionCardProps) {
+function MonitoringSessionRow({ session, isSelected, onSelect }: MonitoringSessionRowProps) {
+  const { progress, health } = session;
+  const attention = session.state === "error" || session.state === "stalled" || health.errorCount > 0;
+
   return (
     <button
+      type="button"
       onClick={onSelect}
-      className={`w-full text-left p-4 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/20 ${
+      className={`w-full rounded-xl border px-4 py-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/20 ${
         isSelected
-          ? "border-white/20 bg-white/5"
-          : "border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/5"
+          ? "border-white/20 bg-white/10 shadow-inner"
+          : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-2">
-            <SessionStatusIndicator 
-              status={session.sessionState} 
-              size="sm"
-            />
-            <span className="text-sm text-slate-300 truncate">
-              {session.metadata.name || "Unnamed Session"}
-            </span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <SessionStatusIndicator status={session.state} size="sm" />
+            <span className="truncate text-sm text-slate-200">{session.metadata.environment ?? session.sessionId}</span>
           </div>
-          
-          <div className="space-y-1 text-xs text-slate-400">
-            <div className="flex items-center gap-4">
-              <span>
-                <span className="text-slate-500">Tokens:</span>{" "}
-                <span className="text-slate-300 font-mono">
-                  {session.progress.tokenUsage.totalTokens.toLocaleString()}
-                </span>
-              </span>
-              <span>
-                <span className="text-slate-500">Messages:</span>{" "}
-                <span className="text-slate-300">{session.progress.messagesCount}</span>
-              </span>
-            </div>
-            {session.progress.currentActivity && (
-              <div className="truncate">
-                <span className="text-slate-500">Activity:</span>{" "}
-                <span className="text-slate-300">{session.progress.currentActivity}</span>
-              </div>
-            )}
+          {progress.currentActivity && (
+            <div className="truncate text-xs text-slate-500">{progress.currentActivity}</div>
+          )}
+          <div className="flex flex-wrap gap-3 text-[11px] uppercase tracking-wider text-slate-500">
+            <span className="text-slate-300">
+              Tokens {progress.tokenUsage.totalTokens.toLocaleString()}
+            </span>
+            <span>
+              Messages {progress.messagesCount}
+            </span>
+            <span>{Math.round(progress.duration / 60000)} min</span>
           </div>
         </div>
-
-        <div className="text-right space-y-1">
-          <div className="text-xs text-slate-500">
-            Updated {new Date(session.timestamp).toLocaleTimeString()}
-          </div>
-          {session.health.errorCount > 0 && (
-            <div className="text-xs text-rose-300">
-              {session.health.errorCount} error{session.health.errorCount !== 1 ? "s" : ""}
-            </div>
+        <div className="flex flex-col items-end gap-1 text-xs text-slate-500">
+          <span>{formatRelativeTime(session.timestamp)}</span>
+          {attention && (
+            <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
+              Attention
+            </span>
           )}
         </div>
       </div>
