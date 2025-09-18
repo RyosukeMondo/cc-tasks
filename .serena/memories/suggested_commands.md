@@ -1,4 +1,4 @@
-# Suggested Commands for CC-Manager
+# Suggested Commands for CC-Tasks
 
 ## Development Commands
 - `pnpm dev` - Start development server with Turbopack and host on 0.0.0.0

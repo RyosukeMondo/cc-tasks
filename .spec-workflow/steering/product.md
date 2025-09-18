@@ -1,7 +1,7 @@
 # Product Overview
 
 ## Product Purpose
-CC-Manager is a task queue management interface for Claude Code sessions. It provides a unified dashboard for orchestrating, monitoring, and managing complex multi-step AI-assisted development workflows. The product solves the challenge of efficiently managing parallel Claude Code processes and maintaining visibility into long-running development tasks.
+CC-Tasks is a task queue management interface for Claude Code sessions. It provides a unified dashboard for orchestrating, monitoring, and managing complex multi-step AI-assisted development workflows. The product solves the challenge of efficiently managing parallel Claude Code processes and maintaining visibility into long-running development tasks.
 
 ## Target Users
 **Primary Users**: Development teams and technical leads using Claude Code for complex, multi-session development workflows
@@ -56,7 +56,7 @@ CC-Manager is a task queue management interface for Claude Code sessions. It pro
 
 ## Future Vision
 
-The CC-Manager will evolve into a comprehensive AI development orchestration platform that enables teams to scale AI-assisted development processes across large organizations.
+The CC-Tasks will evolve into a comprehensive AI development orchestration platform that enables teams to scale AI-assisted development processes across large organizations.
 
 ### Potential Enhancements
 - **Remote Access**: Tunnel-based sharing for stakeholder visibility into development progress

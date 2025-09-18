@@ -33,6 +33,7 @@ type UseSessionMonitoringResult = {
   refresh: () => Promise<void>;
   retryOperation: () => Promise<void>;
   clearError: () => void;
+  resetCircuitBreaker: () => void;
   isMonitoring: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -131,19 +132,22 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         if (!mountedRef.current) {
-          throw new Error('Component unmounted');
+          // Component unmounted - return early without error
+          return null;
         }
         
         setConnectionStatus(attempt === 1 ? 'connecting' : 'connecting');
         const result = await operation();
         
-        // Success - reset failure tracking
-        setConsecutiveFailures(0);
-        setLastSuccessTime(new Date());
-        setConnectionStatus('connected');
-        setError(null);
-        setErrorInfo(null);
-        
+        // Success - reset failure tracking (only if still mounted)
+        if (mountedRef.current) {
+          setConsecutiveFailures(0);
+          setLastSuccessTime(new Date());
+          setConnectionStatus('connected');
+          setError(null);
+          setErrorInfo(null);
+        }
+
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -164,12 +168,12 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
       }
     }
     
-    // All retries failed
-    if (lastError) {
+    // All retries failed (only update state if still mounted)
+    if (lastError && mountedRef.current) {
       const newConsecutiveFailures = consecutiveFailures + 1;
       setConsecutiveFailures(newConsecutiveFailures);
       setConnectionStatus('error');
-      
+
       const errorInfo = classifyError(lastError, operationName);
       setError(lastError);
       setErrorInfo(errorInfo);
@@ -424,14 +428,13 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     }
   }, [loadMonitoringData, startMonitoring, stopMonitoring]);
 
-  // Clear error state
+  // Clear error state and reset circuit breaker
   const clearError = useCallback(() => {
     setError(null);
     setErrorInfo(null);
-    if (consecutiveFailures < ERROR_CONFIG.MAX_CONSECUTIVE_FAILURES) {
-      setConnectionStatus(isMonitoring ? 'connected' : 'disconnected');
-    }
-  }, [consecutiveFailures, isMonitoring]);
+    setConsecutiveFailures(0); // Reset circuit breaker
+    setConnectionStatus(isMonitoring ? 'connected' : 'disconnected');
+  }, [isMonitoring]);
 
   // Manual refresh
   const refresh = useCallback(async () => {
@@ -442,6 +445,25 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
       setIsLoading(false);
     }
   }, [loadMonitoringData]);
+
+  // Reset circuit breaker and retry monitoring
+  const resetCircuitBreaker = useCallback(() => {
+    setConsecutiveFailures(0);
+    setError(null);
+    setErrorInfo(null);
+    setConnectionStatus('disconnected');
+
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
+    // Attempt to restart monitoring
+    if (isMonitoring) {
+      loadMonitoringData().catch(console.error);
+      startPolling();
+    }
+  }, [isMonitoring, loadMonitoringData, startPolling]);
 
   // Circuit breaker logic - pause polling if too many failures
   useEffect(() => {
@@ -474,6 +496,7 @@ export function useSessionMonitoring(projectId: string): UseSessionMonitoringRes
     refresh,
     retryOperation,
     clearError,
+    resetCircuitBreaker,
     isMonitoring,
     isLoading,
     error,

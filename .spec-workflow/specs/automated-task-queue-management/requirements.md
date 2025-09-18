@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Automated Task Queue Management provides the core orchestration capability for CC-Manager, enabling users to create, prioritize, and automatically execute development tasks through Claude Code sessions. This feature transforms the current monitoring and viewing capabilities into a comprehensive task management system that can queue work, launch sessions automatically, and track completion progress toward defined goals.
+Automated Task Queue Management provides the core orchestration capability for CC-Tasks, enabling users to create, prioritize, and automatically execute development tasks through Claude Code sessions. This feature transforms the current monitoring and viewing capabilities into a comprehensive task management system that can queue work, launch sessions automatically, and track completion progress toward defined goals.
 
 ## Alignment with Product Vision
 

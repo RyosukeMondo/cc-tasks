@@ -1,6 +1,6 @@
 import { QueueTaskDraft, Task, TaskSession, TaskStatus } from "@/lib/types/task";
 
-const STORAGE_KEY = "cc-manager.tasks";
+const STORAGE_KEY = "cc-tasks.tasks";
 
 const STATUS_VALUES: readonly TaskStatus[] = ["queued", "processing", "paused", "aborted", "completed"];
 

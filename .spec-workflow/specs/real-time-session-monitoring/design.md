@@ -2,7 +2,7 @@
 
 ## Overview
 
-Real-Time Session Monitoring extends the current CC-Manager system with live visibility into active Claude Code sessions. The feature builds on the existing session discovery and viewing capabilities to provide continuous monitoring of session state, progress tracking, and interactive session controls. This creates a comprehensive monitoring dashboard that transforms the static task queue into a dynamic orchestration interface.
+Real-Time Session Monitoring extends the current CC-Tasks system with live visibility into active Claude Code sessions. The feature builds on the existing session discovery and viewing capabilities to provide continuous monitoring of session state, progress tracking, and interactive session controls. This creates a comprehensive monitoring dashboard that transforms the static task queue into a dynamic orchestration interface.
 
 ## Steering Document Alignment
 

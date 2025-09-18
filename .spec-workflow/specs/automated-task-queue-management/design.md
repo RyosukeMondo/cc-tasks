@@ -2,7 +2,7 @@
 
 ## Overview
 
-Automated Task Queue Management extends the existing CC-Manager system from a monitoring and viewing platform to a comprehensive orchestration system. This feature transforms the current static task data (currently mock) into a dynamic, automated execution engine that can create, prioritize, launch, monitor, and complete development tasks through automated Claude Code session management. The design builds on the existing monitoring infrastructure to provide the core value proposition of intelligent task orchestration.
+Automated Task Queue Management extends the existing CC-Tasks system from a monitoring and viewing platform to a comprehensive orchestration system. This feature transforms the current static task data (currently mock) into a dynamic, automated execution engine that can create, prioritize, launch, monitor, and complete development tasks through automated Claude Code session management. The design builds on the existing monitoring infrastructure to provide the core value proposition of intelligent task orchestration.
 
 ## Steering Document Alignment
 

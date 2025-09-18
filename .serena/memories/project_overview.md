@@ -1,7 +1,7 @@
-# CC-Manager Project Overview
+# CC-Tasks Project Overview
 
 ## Purpose
-CC-Manager is a Next.js web application for managing Claude Code tasks and sessions. It appears to be a project management tool specifically designed for Claude Code workflows, with features for viewing projects, sessions, conversations, and task management.
+CC-Tasks is a Next.js web application for managing Claude Code tasks and sessions. It appears to be a project management tool specifically designed for Claude Code workflows, with features for viewing projects, sessions, conversations, and task management.
 
 ## Tech Stack
 - **Framework**: Next.js 15.5.3 with App Router
